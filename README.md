@@ -68,6 +68,8 @@ python inference.py --data_dir=./data --output_dir --input_size=2048 --batch_siz
 
 ## Project Structure
 
+프로젝트 폴더 구조를 맞춰야 상대경로로 인식됩니다. 
+
 ```
 project_root/
 │
