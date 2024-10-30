@@ -83,9 +83,7 @@ project_root/
 │   │       └── test.json
 │   │
 │   ├──japanese_receipt/ 
-│   │
 │   ├──thai_receipt/ 
-│   │
 │   └── vietnamese_receipt/ 
 │
 ├── streamlit/
