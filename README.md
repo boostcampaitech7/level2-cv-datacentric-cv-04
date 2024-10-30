@@ -88,6 +88,16 @@ project_root/
 │   │
 │   └── vietnamese_receipt/ 
 │
+├── streamlit/
+│   ├── pages/
+│   │   ├── data_EDA.py
+│   │   └── data_viewer.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── streamlit_data_loader.py
+│   ├── main.py
+│   └── st_requierment.txt
+│
 ├── pths/
 ├── predictions/
 ├── trained_models/
