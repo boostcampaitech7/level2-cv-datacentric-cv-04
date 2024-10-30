@@ -68,27 +68,24 @@ python inference.py --data_dir=./data --output_dir --input_size=2048 --batch_siz
 
 ## Project Structure
 
-project_root/  
-│  
-├── data/  
-│   ├── train/  
-│   └── test/  
-│  
-├── pths/  
-│  
-├── predictions/  
-│  
-├── trained_models/  
-│  
-├── dataset.py  
-├── deteval.py  
-├── east_dataset.py  
-├── train.py  
-├── inference.py  
-├── requirements.txt  
-├── loss.py  
-├── model.py  
-└── README.md  
-
+project_root/
+│
+├── data/
+│   ├── train/
+│   └── test/
+│
+├── pths/
+├── predictions/
+├── trained_models/
+│
+├── dataset.py
+├── deteval.py
+├── east_dataset.py
+├── train.py
+├── inference.py
+├── requirements.txt
+├── loss.py
+├── model.py
+└── README.md
 
    
