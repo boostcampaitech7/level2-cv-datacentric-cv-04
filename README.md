@@ -74,8 +74,19 @@ python inference.py --data_dir=./data --output_dir --input_size=2048 --batch_siz
 project_root/
 │
 ├── data/
-│   ├── train/
-│   └── test/
+│   ├──chinese_receipt/
+│   │   ├── img
+│   │   │   ├── train/
+│   │   │   └── test/
+│   │   └── ufo
+│   │       ├── train.json
+│   │       └── test.json
+│   │
+│   ├──japanese_receipt/ 
+│   │
+│   ├──thai_receipt/ 
+│   │
+│   └── vietnamese_receipt/ 
 │
 ├── pths/
 ├── predictions/
