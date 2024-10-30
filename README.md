@@ -71,8 +71,9 @@ python inference.py --data_dir=./data --output_dir --input_size=2048 --batch_siz
 프로젝트 폴더 구조를 맞춰야 상대경로로 인식됩니다. 
 
 ```
-project_root/
-│
+** project structure **
+
+level2-cv-datacentric-cv-04/
 ├── data/
 │   ├──chinese_receipt/
 │   │   ├── img
@@ -83,10 +84,50 @@ project_root/
 │   │       └── test.json
 │   │
 │   ├──japanese_receipt/ 
+│   │   ├── img
+│   │   │   ├── train/
+│   │   │   └── test/
+│   │   └── ufo
+│   │       ├── train.json
+│   │       └── test.json
 │   │
 │   ├──thai_receipt/ 
+│   │   ├── img
+│   │   │   ├── train/
+│   │   │   └── test/
+│   │   └── ufo
+│   │       ├── train.json
+│   │       └── test.json
 │   │
-│   └── vietnamese_receipt/ 
+│   ├── vietnamese_receipt/
+│   │   ├── img
+│   │   │   ├── train/
+│   │   │   └── test/
+│   │   └── ufo
+│   │       ├── train.json
+│   │       └── test.json 
+│   │
+│   └── merged_receipts/
+│       ├── images
+│       │   ├── train/
+│       │   └── val/
+│       ├── train.json
+│       └── val.json
+│
+│
+├── streamlit/
+│   ├── pages/
+│   │   ├── data_EDA.py
+│   │   └── data_viewer.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── streamlit_data_loader.py
+│   ├── main.py
+│   └── st_requierment.txt
+│
+├──utils/
+│   ├── add_language.py
+│   └── prepare_dataset.py
 │
 ├── pths/
 ├── predictions/

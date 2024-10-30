@@ -10,6 +10,7 @@ from torch import cuda
 from torch.utils.data import DataLoader
 from torch.optim import lr_scheduler
 from tqdm import tqdm
+import wandb
 
 from east_dataset import EASTDataset
 from dataset import SceneTextDataset
@@ -44,6 +45,17 @@ def parse_args():
 
 def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval):
+    wandb.init(
+        project="EAST-Text-Detection",
+        config={
+            "learning_rate": learning_rate,
+            "batch_size": batch_size,
+            "max_epoch": max_epoch,
+            "image_size": image_size,
+            "input_size": input_size,
+        }
+    )
+    
     dataset = SceneTextDataset(
         data_dir,
         split='train',
@@ -79,6 +91,13 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                 loss_val = loss.item()
                 epoch_loss += loss_val
 
+                wandb.log({
+                    "batch_loss": loss_val,
+                    "cls_loss": extra_info['cls_loss'],
+                    "angle_loss": extra_info['angle_loss'],
+                    "iou_loss": extra_info['iou_loss']
+                })
+
                 pbar.update(1)
                 val_dict = {
                     'Cls loss': extra_info['cls_loss'], 'Angle loss': extra_info['angle_loss'],
@@ -87,9 +106,16 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                 pbar.set_postfix(val_dict)
 
         scheduler.step()
+        
+        mean_epoch_loss = epoch_loss / num_batches
+        wandb.log({
+            "epoch": epoch + 1,
+            "mean_epoch_loss": mean_epoch_loss,
+            "learning_rate": scheduler.get_last_lr()[0]
+        })
 
         print('Mean loss: {:.4f} | Elapsed time: {}'.format(
-            epoch_loss / num_batches, timedelta(seconds=time.time() - epoch_start)))
+            mean_epoch_loss, timedelta(seconds=time.time() - epoch_start)))
 
         if (epoch + 1) % save_interval == 0:
             if not osp.exists(model_dir):
@@ -97,6 +123,9 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
 
             ckpt_fpath = osp.join(model_dir, 'latest.pth')
             torch.save(model.state_dict(), ckpt_fpath)
+            wandb.save(ckpt_fpath)
+
+    wandb.finish()
 
 
 def main(args):
