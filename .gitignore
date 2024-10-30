@@ -154,3 +154,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Weights & Biases
+wandb/
+.env
+*.pth
+trained_models/

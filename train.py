@@ -14,6 +14,8 @@ from torch.utils.data import DataLoader
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 import wandb
+import yaml
+from dotenv import load_dotenv
 
 from east_dataset import EASTDataset
 from dataset import SceneTextDataset
@@ -48,8 +50,27 @@ def parse_args():
 
 def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval):
+    # wandb 설정 파일 로드
+    try:
+        with open('wandb_config.yaml', 'r') as f:
+            wandb_config = yaml.safe_load(f)
+    except FileNotFoundError:
+        print("wandb_config.yaml 파일을 찾을 수 없습니다. 기본 설정을 사용합니다.")
+        wandb_config = {
+            "project": "EAST-Text-Detection",
+            "name": "EAST-training"
+        }
+
+    # 환경 변수 로드 (.env 파일에서)
+    load_dotenv()
+
+    # wandb 초기화
     wandb.init(
-        project="EAST-Text-Detection",
+        project=wandb_config.get("project", "EAST-Text-Detection"),
+        entity=wandb_config.get("entity", None),
+        name=wandb_config.get("name", "EAST-training"),
+        tags=wandb_config.get("tags", []),
+        group=wandb_config.get("group", None),
         config={
             "learning_rate": learning_rate,
             "batch_size": batch_size,
@@ -166,12 +187,20 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
         
         # best loss 업데이트
         is_best = mean_epoch_loss < best_loss
+        # best 모델 저장 부분
         if is_best:
             best_loss = mean_epoch_loss
-            # best 모델 저장
             best_ckpt_fpath = osp.join(model_dir, 'best.pth')
             torch.save(model.state_dict(), best_ckpt_fpath)
-            wandb.save(best_ckpt_fpath)
+            
+            # best 모델을 artifact로 저장
+            best_artifact = wandb.Artifact(
+                name='model-checkpoint-best',
+                type='model',
+                description=f'Best model checkpoint (epoch {epoch+1})'
+            )
+            best_artifact.add_file(best_ckpt_fpath)
+            wandb.log_artifact(best_artifact)
         
         # 에폭별 상세 로깅
         wandb.log({
