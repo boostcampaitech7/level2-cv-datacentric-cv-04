@@ -1,0 +1,10 @@
+pull_request_template_chooser:
+  custom_templates:
+    - name: Experiment PR
+      about: Use this template for experiment results
+      template: experiment.md
+      title: "[Experiment] "
+    - name: Feature PR
+      about: Use this template for new feature implementations
+      template: feature.md
+      title: "[Feature] "
