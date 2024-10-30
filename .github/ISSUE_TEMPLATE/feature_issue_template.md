@@ -1,5 +1,5 @@
 ---
-name: feature Template
+name:  기능구현 템플릿
 about: Use this template for feature tasks
 title: "[feature]: "
 labels: feature
