@@ -22,6 +22,12 @@ trained_models/
 
 pths/
 
+# 대회 규정
+model.py
+loss.py
+east_dataset.py
+detect.py
+
 # Logs
 *.log
 
