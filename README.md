@@ -68,6 +68,7 @@ python inference.py --data_dir=./data --output_dir --input_size=2048 --batch_siz
 
 ## Project Structure
 
+```
 project_root/
 │
 ├── data/
@@ -87,5 +88,6 @@ project_root/
 ├── loss.py
 ├── model.py
 └── README.md
+```
 
    
