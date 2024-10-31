@@ -374,21 +374,6 @@ class SceneTextDataset:
             else:
                 print(f"Warning: Image not found: {img_path}")
 
-
-    # def _infer_dir(self, fname):
-    #     lang_indicator = fname.split('.')[1]
-    #     if lang_indicator == 'zh':
-    #         lang = 'chinese'
-    #     elif lang_indicator == 'ja':
-    #         lang = 'japanese'
-    #     elif lang_indicator == 'th':
-    #         lang = 'thai'
-    #     elif lang_indicator == 'vi':
-    #         lang = 'vietnamese'
-    #     else:
-    #         raise ValueError
-    #     return osp.join(self.root_dir, f'{lang}_receipt', 'img', self.split)
-
     def __len__(self):
         # image_fnames 대신 annotations 사용
         return len(self.annotations)
