@@ -228,7 +228,7 @@ def main(args):
     final_loss = do_training(
         **final_params,
         trial=None,  # 최종 학습에서는 trial 없음
-        save_final=True  # 최종 모델 저장을 위한 플래그
+        save_final=True  # 최종 모델 저장
     )
     logger.info(f"Final training completed with loss: {final_loss:.4f}")
     logger.info("=== Training End ===")
