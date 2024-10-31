@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument('--input_size', type=int, default=1024)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--learning_rate', type=float, default=1e-3)
-    parser.add_argument('--max_epoch', type=int, default=150)
+    parser.add_argument('--max_epoch', type=int, default=100)
     parser.add_argument('--save_interval', type=int, default=5)
     
     # # Wandb 관련 인자 추가
@@ -172,7 +172,8 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     model = EAST()
     model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 2], gamma=0.1)
+    # 0.001 -> 0.00025 -> 0.0000625
+    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 4, max_epoch // 2, max_epoch // 4 * 3], gamma=0.25)
 
     model.train()
     for epoch in range(max_epoch):
