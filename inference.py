@@ -37,6 +37,7 @@ def parse_args():
 
 
 def do_inference(model, ckpt_fpath, data_dir, input_size, batch_size, split='test'):
+    # train 파일 수정에 따라 수정한 부분 --> checkpoint의 model_state_dict 부분만 로드함.
     checkpoint = torch.load(ckpt_fpath, map_location='cpu')
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
@@ -79,7 +80,7 @@ def main(args):
                                 args.batch_size, split='test')
     ufo_result['images'].update(split_result['images'])
 
-    output_fname = 'epoch150_best_output.csv'
+    output_fname = 'best_output.csv'
     with open(osp.join(args.output_dir, output_fname), 'w') as f:
         json.dump(ufo_result, f, indent=4)
 
