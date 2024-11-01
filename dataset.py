@@ -9,15 +9,15 @@ import cv2
 import albumentations as A
 from torch.utils.data import Dataset
 from shapely.geometry import Polygon
+
 from numba import njit
 
-# 부분 컴파일을 통한 성능 향상
 @njit
 def cal_distance(x1, y1, x2, y2):
     '''calculate the Euclidean distance'''
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
-
+@njit
 def move_points(vertices, index1, index2, r, coef):
     '''move the two points to shrink edge
     Input:
@@ -50,7 +50,7 @@ def move_points(vertices, index1, index2, r, coef):
         vertices[y2_index] += ratio * length_y
     return vertices
 
-
+@njit
 def shrink_poly(vertices, coef=0.3):
     '''shrink the text region
     Input:
@@ -80,7 +80,6 @@ def shrink_poly(vertices, coef=0.3):
     v = move_points(v, 3 + offset, 4 + offset, r, coef)
     return v
 
-
 @njit
 def get_rotate_mat(theta):
     '''positive theta value means rotate clockwise'''
@@ -103,7 +102,6 @@ def rotate_vertices(vertices, theta, anchor=None):
     res = np.dot(rotate_mat, v - anchor)
     return (res + anchor).T.reshape(-1)
 
-
 @njit
 def get_boundary(vertices):
     '''get the tight boundary around given vertices
@@ -118,7 +116,6 @@ def get_boundary(vertices):
     y_min = min(y1, y2, y3, y4)
     y_max = max(y1, y2, y3, y4)
     return x_min, x_max, y_min, y_max
-
 
 @njit
 def cal_error(vertices):
@@ -135,7 +132,7 @@ def cal_error(vertices):
           cal_distance(x3, y3, x_max, y_max) + cal_distance(x4, y4, x_min, y_max)
     return err
 
-
+@njit
 def find_min_rect_angle(vertices):
     '''find the best angle to rotate poly and obtain min rectangle
     Input:
@@ -235,7 +232,7 @@ def crop_img(img, vertices, labels, length):
     new_vertices[:,[1,3,5,7]] -= start_h
     return region, new_vertices
 
-
+@njit
 def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
     '''get rotated locations of all pixels for next stages
     Input:
@@ -337,63 +334,65 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
 
     return new_vertices, new_labels
 
-
-class SceneTextDataset(Dataset):
-    def __init__(self, root_dir,
-                 split='train',
-                 image_size=2048,
-                 crop_size=1024,
-                 ignore_under_threshold=10,
-                 drop_under_threshold=1,
-                 color_jitter=True,
-                 normalize=True):
-        self._lang_list = ['chinese', 'japanese', 'thai', 'vietnamese']
+# merged_receipts 폴더 구조에 맞게 수정된 코드 
+class SceneTextDataset:
+    def __init__(self, root_dir, split='train', image_size=2048, crop_size=1024, 
+                 ignore_under_threshold=10, drop_under_threshold=1,
+                 color_jitter=True, normalize=True):
         self.root_dir = root_dir
         self.split = split
-        total_anno = dict(images=dict())
-        for nation in self._lang_list:
-            with open(osp.join(root_dir, '{}_receipt/ufo/{}.json'.format(nation, split)), 'r', encoding='utf-8') as f:
-                anno = json.load(f)
-            for im in anno['images']:
-                total_anno['images'][im] = anno['images'][im]
-
-        self.anno = total_anno
-        self.image_fnames = sorted(self.anno['images'].keys())
-
-        self.image_size, self.crop_size = image_size, crop_size
-        self.color_jitter, self.normalize = color_jitter, normalize
-
-        self.drop_under_threshold = drop_under_threshold
+        self.image_size = image_size
+        self.crop_size = crop_size
+        self.color_jitter = color_jitter
+        self.normalize = normalize
         self.ignore_under_threshold = ignore_under_threshold
+        self.drop_under_threshold = drop_under_threshold
 
-    def _infer_dir(self, fname):
-        lang_indicator = fname.split('.')[1]
-        if lang_indicator == 'zh':
-            lang = 'chinese'
-        elif lang_indicator == 'ja':
-            lang = 'japanese'
-        elif lang_indicator == 'th':
-            lang = 'thai'
-        elif lang_indicator == 'vi':
-            lang = 'vietnamese'
-        else:
-            raise ValueError
-        return osp.join(self.root_dir, f'{lang}_receipt', 'img', self.split)
+        # merged_receipts 폴더 구조에 맞게 수정
+        self.image_dir = osp.join(root_dir, 'images', split)
+        self.annotation_path = osp.join(root_dir, f'{split}.json')
+        
+        if not osp.exists(self.image_dir):
+            raise ValueError(f"Image directory not found: {self.image_dir}")
+        if not osp.exists(self.annotation_path):
+            raise ValueError(f"Annotation file not found: {self.annotation_path}")
+            
+        self.annotations = []
+        
+        # UFO 형식 데이터 로드
+        with open(self.annotation_path, 'r', encoding='utf-8') as f:
+            annotations = json.load(f)
+        
+        for image_name, annotation in annotations['images'].items():
+            img_path = osp.join(self.image_dir, image_name)
+            if osp.exists(img_path):  # 이미지 파일이 실제로 존재하는지 확인
+                self.annotations.append({
+                    'file_name': image_name,
+                    'words': annotation.get('words', dict()),
+                    'img_path': img_path
+                })
+            else:
+                print(f"Warning: Image not found: {img_path}")
+
     def __len__(self):
-        return len(self.image_fnames)
+        # image_fnames 대신 annotations 사용
+        return len(self.annotations)
 
     def __getitem__(self, idx):
-        image_fname = self.image_fnames[idx]
-        image_fpath = osp.join(self._infer_dir(image_fname), image_fname)
-
+        # image_fname 대신 annotation 사용
+        annotation = self.annotations[idx]
+        image_fpath = annotation['img_path']
+        
         vertices, labels = [], []
-        for word_info in self.anno['images'][image_fname]['words'].values():
-            num_pts = np.array(word_info['points']).shape[0]
-            if num_pts > 4:
+        for word_info in annotation['words'].values():
+            points = np.array(word_info['points'])
+            if points.shape[0] > 4:
                 continue
-            vertices.append(np.array(word_info['points']).flatten())
+            vertices.append(points.flatten())
             labels.append(1)
-        vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+        vertices = np.array(vertices, dtype=np.float32)
+        labels = np.array(labels, dtype=np.int64)
+
 
         vertices, labels = filter_vertices(
             vertices,
