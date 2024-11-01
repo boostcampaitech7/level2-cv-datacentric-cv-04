@@ -42,7 +42,7 @@ OCR은 글자 검출 (text detection), 글자 인식 (text recognition), 정렬�
 
 1. Clone the repository & download data:
    ```
-   git clone https://github.com/boostcampaitech7/level2-objectdetection-cv-04.git
+   git clone https://github.com/boostcampaitech7/level2-datacentric-cv-04.git
    cd level2-objectdetection-cv-04.git
    ```
 2. setup
