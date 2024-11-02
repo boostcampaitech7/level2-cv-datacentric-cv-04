@@ -44,8 +44,8 @@ def parse_args():
     parser.add_argument('--save_interval', type=int, default=5)
     # Arguments related to Recall, Precision, F1-Score Evaluation
     parser.add_argument('--valid_json_file', type=str, default='merged_receipts/val.json', help='Validation Json File for calculating F1 score. This will be joined with args.data_dir')
-    parser.add_argument('--start_evaluation', type=int, default=2, help='Evaluation of Recall, Precision, F1-Score is started from this epoch')
-    parser.add_argument('--evaluation_interval', type=int, default=2, help='Sets interval for calculating Recall, Precision, F1-Score. Calculated from args.start_evaluation epoch')
+    parser.add_argument('--start_evaluation', type=int, default=60, help='Evaluation of Recall, Precision, F1-Score is started from this epoch')
+    parser.add_argument('--evaluation_interval', type=int, default=5, help='Sets interval for calculating Recall, Precision, F1-Score. Calculated from args.start_evaluation epoch')
     # Wandb 관련 인자 추가
     parser.add_argument('--wandb_project', type=str, default='EAST_MetricCheck')
     parser.add_argument('--wandb_entity', type=str, default='cv_04_data_centric')
