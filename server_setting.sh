@@ -10,7 +10,7 @@ echo "build-essential 설치 중..."
 apt-get install -y build-essential
 
 # 코드 다운로드
-git clone https://github.com/MhLah/level2-cv-datacentric-cv-04.git
+git clone https://github.com/boostcampaitech7/level2-cv-datacentric-cv-04.git
 cd level2-cv-datacentric-cv-04
 
 # requirements.txt 파일 설치
