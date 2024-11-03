@@ -13,9 +13,8 @@ python utils/cord2ufo.py
 # train, validation에 영어 데이터 추가
 python utils/prepare_dataset.py --external_data
 
-# 압축 파일 및 중간 파일 삭제
+# 압축 파일 삭제
 rm -rf CORD-1k-001.zip
-rm -rf CORD
 
 echo "영어 영수증(CORD) 데이터 준비가 완료되었습니다."
 
