@@ -9,6 +9,7 @@ def main():
         '태국어': 'thai_receipt',
         '중국어': 'chinese_receipt',
         '일본어': 'japanese_receipt',
+        '영어': 'english_receipt'
     }
 
     # 기본 경로 설정 (실제 경로로 수정 필요)
