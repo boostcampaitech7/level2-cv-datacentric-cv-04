@@ -3,6 +3,7 @@ import os
 import random
 from pathlib import Path
 import shutil
+from argparse import ArgumentParser
 
 def load_ufo_data(json_path):
     with open(json_path, 'r', encoding='utf-8') as f:
@@ -107,13 +108,33 @@ def merge_and_split_dataset(
         'val_size': len(val_images)
     }
 
+def main(args):
+    print("Preparing dataset...")
+    
+    # 기본 languages 리스트
+    languages = ['chinese_receipt', 'japanese_receipt', 'thai_receipt', 'vietnamese_receipt']
+    
+    # external_data가 True일 때만 english_receipt 추가
+    if args.external_data:
+        languages.append('english_receipt')
+    
+    result = merge_and_split_dataset(
+        root_dir=args.data_dir,
+        languages=languages,
+        val_ratio=args.val_ratio,
+        seed=args.seed
+    )
+    
+    print(f"\nDataset preparation completed!")
+    print(f"Train set size: {result['train_size']}")
+    print(f"Validation set size: {result['val_size']}")
+
 if __name__ == '__main__':
-    try:
-        result = merge_and_split_dataset()
-        print(f"\n데이터 분할 완료:")
-        print(f"학습 데이터: {result['train_size']}개")
-        print(f"검증 데이터: {result['val_size']}개")
-    except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        import traceback
-        traceback.print_exc()
+    parser = ArgumentParser()
+    parser.add_argument('--data_dir', type=str, default='../data')
+    parser.add_argument('--val_ratio', type=float, default=0.2)
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--external_data', action='store_true', help='Include english receipt data')
+    
+    args = parser.parse_args()
+    main(args)
