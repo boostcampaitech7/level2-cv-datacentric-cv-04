@@ -93,6 +93,26 @@ def save_checkpoint(model, optimizer, scheduler, epoch, loss, model_dir, f1=None
     artifact.add_file(save_path)
     wandb.log_artifact(artifact)
 
+def check_loss_errors(extra_info, img, epoch, phase="train"):
+    """
+    Loss가 None인지 체크하고 에러를 로깅하는 함수
+    Returns: True if there was an error, False otherwise
+    """
+    for loss_type in ['cls_loss', 'angle_loss', 'iou_loss']:
+        if extra_info[loss_type] is None:
+            wandb.log({
+                "error_type": loss_type,
+                "error_batch_shape": img.shape,
+                "error_phase": phase,
+                # "error_image": wandb.Image(img[0].cpu().numpy(), caption=f"Error Image - {loss_type} ({phase})"),
+                "epoch": epoch + 1
+            })
+            print(f"Error in {loss_type} loss at {phase} phase")
+            print(f"Batch shape: {img.shape}")
+            print(f"Epoch: {epoch + 1}")
+            return True
+    return False
+
 def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval, pretrained_model, **kwargs):
     
@@ -191,7 +211,7 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
         print('Loading base model')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # 0.001 -> 0.00025 -> 0.0000625
-    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 4, max_epoch // 2, max_epoch // 4 * 3], gamma=0.25)
+    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 2], gamma=0.1)
 
     model.train()
     for epoch in range(max_epoch):
@@ -205,6 +225,11 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                 pbar.set_description(f'[Epoch {epoch + 1}]')
                 
                 loss, extra_info = model.train_step(img, gt_score_map, gt_geo_map, roi_mask)
+                
+                # 에러 체크
+                if check_loss_errors(extra_info, img, epoch, "train"):
+                    continue
+                
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -255,7 +280,11 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                     gt_geo_map, roi_mask = gt_geo_map.to(device), roi_mask.to(device)
 
                     loss, extra_info = model.train_step(img, gt_score_map, gt_geo_map, roi_mask)
-
+                    
+                    # 에러 체크
+                    if check_loss_errors(extra_info, img, epoch, "validation"):
+                        continue
+                    
                     val_loss += loss.item()
                     val_cls_loss += extra_info['cls_loss']
                     val_angle_loss += extra_info['angle_loss']
