@@ -7,22 +7,39 @@ import shutil
 """
 CORD 데이터셋을 UFO 형식으로 변환하고 이미지 파일을 복사
 """
+def get_excluded_images():
+    """제외할 이미지 번호 목록을 반환합니다."""
+    return {
+        '002', '004', '098', '127', '264', '286', '291', '293', '296', '302', 
+        '308', '316', '362', '386', '403', '404', '427', '449', '459', '463', 
+        '484', '501', '515', '554', '556', '559', '561', '576', '588', '627', 
+        '647', '676', '680', '736', '760', '778', '789'
+    }
+
 def convert_cord_to_ufo(json_dir, img_dir, target_img_dir):
     ufo_json = {
         "images": {}
     }
     
+    # 제외할 이미지 번호 가져오기
+    excluded_images = get_excluded_images()
+    
     # JSON 파일 목록 가져오기
     json_files = sorted(glob.glob(os.path.join(json_dir, "*.json")))
     
     for json_path in json_files:
+        # 파일 번호 추출 (receipt_00001.json -> 00001)
+        file_num = Path(json_path).stem.split('_')[1]
+        
+        # 제외할 이미지인 경우 건너뛰기
+        if file_num in excluded_images:
+            print(f"제외된 이미지: receipt_{file_num}")
+            continue
+            
         # CORD JSON 파일 로드
         with open(json_path, 'r', encoding='utf-8') as f:
             cord_json = json.load(f)
             
-        # 파일 번호 추출 (receipt_00001.json -> 00001)
-        file_num = Path(json_path).stem.split('_')[1]
-        
         # 원본 이미지 파일명과 새로운 이미지 파일명
         orig_image = f"receipt_{file_num}.png"
         new_image = f"english_receipt_extractor.en.in_external_{file_num}.jpg"
@@ -80,6 +97,9 @@ def main():
     # 데이터 디렉토리 설정
     cord_base_dir = "../CORD"
     target_base_dir = "../data/english_receipt"
+    
+    if not os.path.exists(target_base_dir):
+        os.makedirs(target_base_dir)
     
     # 소스 디렉토리 설정
     train_json_dir = os.path.join(cord_base_dir, "train/json")

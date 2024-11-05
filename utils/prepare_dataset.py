@@ -117,6 +117,7 @@ def main(args):
     # external_data가 True일 때만 english_receipt 추가
     if args.external_data:
         languages.append('english_receipt')
+        languages.append('sroie_receipt')
     
     result = merge_and_split_dataset(
         root_dir=args.data_dir,
