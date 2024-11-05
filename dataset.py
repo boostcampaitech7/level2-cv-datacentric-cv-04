@@ -11,7 +11,8 @@ from torch.utils.data import Dataset
 from shapely.geometry import Polygon
 
 from numba import njit
-
+from numba import jit, prange
+from concurrent.futures import ThreadPoolExecutor
 @njit
 def cal_distance(x1, y1, x2, y2):
     '''calculate the Euclidean distance'''
@@ -232,6 +233,8 @@ def crop_img(img, vertices, labels, length):
     new_vertices[:,[1,3,5,7]] -= start_h
     return region, new_vertices
 
+
+
 @njit
 def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
     '''get rotated locations of all pixels for next stages
@@ -264,9 +267,42 @@ def resize_img(img, vertices, size):
         img = img.resize((size, int(h * ratio)), Image.BILINEAR)
     else:
         img = img.resize((int(w * ratio), size), Image.BILINEAR)
-    new_vertices = vertices * ratio
-    return img, new_vertices
+    if vertices is not None:
+        new_vertices = vertices * ratio
+        return img, new_vertices
+    else:
+        return img
 
+def flip_img(img, vertices, flip_type="horizontal"):
+    """이미지와 vertices를 좌우 또는 상하 반전
+    
+    Args:
+        img: PIL Image
+        vertices: 텍스트 영역의 좌표 (n,8) 
+        flip_type: "horizontal" 또는 "vertical"
+        
+    Returns:
+        img: 반전된 PIL Image
+        new_vertices: 반전된 vertices 좌표
+    """
+    w, h = img.width, img.height
+    
+    if flip_type == "horizontal":
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        if vertices is not None and vertices.size > 0:
+            new_vertices = vertices.copy()
+            new_vertices[:, [0,2,4,6]] = w - vertices[:, [0,2,4,6]]
+    elif flip_type == "vertical":
+        img = img.transpose(Image.FLIP_TOP_BOTTOM)
+        if vertices is not None and vertices.size > 0:
+            new_vertices = vertices.copy()
+            new_vertices[:, [1,3,5,7]] = h - vertices[:, [1,3,5,7]]
+    else:
+        raise ValueError("flip_type must be 'horizontal' or 'vertical'")
+        
+    if vertices is not None:
+        return img, new_vertices
+    return img
 
 def adjust_height(img, vertices, ratio=0.2):
     '''adjust height of image to aug data
@@ -283,10 +319,13 @@ def adjust_height(img, vertices, ratio=0.2):
     new_h = int(np.around(old_h * ratio_h))
     img = img.resize((img.width, new_h), Image.BILINEAR)
 
-    new_vertices = vertices.copy()
-    if vertices.size > 0:
-        new_vertices[:,[1,3,5,7]] = vertices[:,[1,3,5,7]] * (new_h / old_h)
-    return img, new_vertices
+    if vertices is not None:
+        new_vertices = vertices.copy()
+        if vertices.size > 0:
+            new_vertices[:,[1,3,5,7]] = vertices[:,[1,3,5,7]] * (new_h / old_h)
+        return img, new_vertices
+    else:
+        return img, None
 
 
 def rotate_img(img, vertices, angle_range=10):
@@ -335,6 +374,208 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
     return new_vertices, new_labels
 
 # merged_receipts 폴더 구조에 맞게 수정된 코드 
+# def lsa_processing(img_array):
+#     """L*a*b* 색공간에서 L채널 처리"""
+#     # 이미지가 그레이스케일인 경우 바로 처리
+#     if len(img_array.shape) == 2:
+#         l = img_array
+#     else:
+#         # RGB to LAB 변환
+#         lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
+#         l, a, b = cv2.split(lab)
+    
+#     # L채널에 대해 CLAHE 적용
+#     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+#     enhanced_l = clahe.apply(l)
+    
+#     # Bilateral 필터로 노이즈 제거하면서 경계는 보존
+#     smooth_l = cv2.bilateralFilter(enhanced_l, 9, 75, 75)
+
+#     return smooth_l
+
+# 경계 강조 실험 함수
+# def preprocess_receipt(image):
+#     """영수증 이미지 전처리 함수"""
+#     # PIL Image를 numpy array로 변환
+#     if isinstance(image, Image.Image):
+#         # RGB로 변환 보장
+#         image = image.convert('RGB')
+#         img_array = np.array(image)
+#     else:
+#         img_array = image.copy()
+#         # 그레이스케일 이미지인 경우 RGB로 변환
+#         if len(img_array.shape) == 2:
+#             img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2RGB)
+    
+#     # smooth_l = lsa_processing(img_array)
+    
+#     # # 노이즈 제거
+#     # denoised = cv2.medianBlur(smooth_l , 3)
+
+#     # # 대비 향상
+#     # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+#     # enhanced = clahe.apply(denoised)
+#     # # if isinstance(image, Image.Image):
+#     # #     img_array = np.array(image)
+#     # # else:
+#     # #     img_array = image.copy()
+    
+#     # # # RGB to Grayscale 변환
+#     # # enhanced = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+    
+
+#     # 기본 전처리
+#     base_processed = ((lab_processing(img_array).astype(np.float32) + 
+#                       hsv_processing(img_array).astype(np.float32)) / 2)
+    
+#     # 배경 제거 처리
+#     background_removed = ((improved_background_removal(lab_processing(img_array).astype(np.float32)) + 
+#                          improved_background_removal(hsv_processing(img_array).astype(np.float32))) / 2)
+    
+#     # 두 그레이스케일 결과를 합치고 RGB로 변환
+#     processed = (0.7 * base_processed + 0.3 * background_removed).astype(np.uint8)
+#     processed_rgb = cv2.cvtColor(processed, cv2.COLOR_GRAY2RGB)
+    
+#     # 원본 이미지와 블렌딩
+#     img_array = ((img_array + processed_rgb) / 2).astype(np.uint8)
+
+#     return Image.fromarray(img_array)
+
+
+@jit(nopython=True, parallel=True)
+def _apply_mask_numba(array, mask):
+    """Numba로 최적화된 마스크 적용 함수"""
+    result = array.copy()
+    for i in prange(array.shape[0]):
+        for j in prange(array.shape[1]):
+            if not mask[i, j]:
+                result[i, j] = 0
+    return result
+
+def preprocess_receipt(image):
+    """영수증 이미지 전처리 함수 - CPU 최적화 버전
+    
+    Args:
+        image: PIL.Image 또는 numpy array 형식의 입력 이미지
+    Returns:
+        PIL.Image: 처리된 이미지
+    """
+    # PIL.Image를 numpy array로 변환
+    if isinstance(image, Image.Image):
+        img_array = np.array(image)
+    else:
+        img_array = image.copy()
+
+    # ThreadPoolExecutor를 사용한 병렬 처리
+    with ThreadPoolExecutor() as executor:
+        lab_future = executor.submit(lab_processing, img_array)
+        hsv_future = executor.submit(hsv_processing, img_array)
+        
+        lab_result = lab_future.result()
+        hsv_result = hsv_future.result()
+    
+    # 벡터화된 연산으로 최적화
+    combined = np.add(
+        np.multiply(lab_result.astype(np.float32), 0.7),
+        np.multiply(hsv_result.astype(np.float32), 0.3)
+    ) / 3
+    
+    # 배경 제거 병렬 처리
+    with ThreadPoolExecutor() as executor:
+        lab_bg_future = executor.submit(background_removal, lab_result.astype(np.float32))
+        hsv_bg_future = executor.submit(background_removal, hsv_result.astype(np.float32))
+        
+        bg_removed = np.add(lab_bg_future.result(), hsv_bg_future.result()) / 2
+    
+    # 최종 결과 계산
+    result = np.add(combined, bg_removed).astype(np.uint8)
+    
+    return Image.fromarray(result)
+
+def lab_processing(img_array):
+    """LAB 색공간 기반 이미지 처리"""
+    # PIL Image를 numpy array로 변환
+    if isinstance(img_array, Image.Image):
+        img_array = np.array(img_array)
+    
+    # 그레이스케일 이미지를 BGR로 변환
+    if len(img_array.shape) == 2:
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2BGR)
+    
+    # LAB 변환
+    lab = cv2.cvtColor(img_array, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # 마스크 생성
+    mask = np.logical_or(
+        np.logical_and(
+            l > 90,
+            np.logical_and(
+                np.abs(a) < 155,
+                np.abs(b) < 155
+            )
+        ),
+        l < 1
+    )
+    
+    # Numba 최적화된 마스크 적용
+    return _apply_mask_numba(l, mask)
+
+def hsv_processing(img_array):
+    """HSV 색공간 기반 이미지 처리"""
+    # PIL Image를 numpy array로 변환
+    if isinstance(img_array, Image.Image):
+        img_array = np.array(img_array)
+    
+    # 그레이스케일 이미지를 BGR로 변환
+    if len(img_array.shape) == 2:
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2BGR)
+    
+    # HSV 변환
+    hsv = cv2.cvtColor(img_array, cv2.COLOR_BGR2HSV)
+    _, s, v = cv2.split(hsv)
+    
+    # 마스크 생성
+    mask = np.logical_or(
+        np.logical_and(s < 100, v > 10),
+        v < 1
+    )
+    
+    # Numba 최적화된 마스크 적용
+    return _apply_mask_numba(v, mask)
+
+@jit(nopython=True)
+def _apply_morphology(image, kernel_size):
+    """모폴로지 연산을 위한 Numba 최적화 함수"""
+    height, width = image.shape
+    result = np.zeros_like(image)
+    
+    for i in prange(kernel_size//2, height - kernel_size//2):
+        for j in prange(kernel_size//2, width - kernel_size//2):
+            window = image[i-kernel_size//2:i+kernel_size//2+1,
+                         j-kernel_size//2:j+kernel_size//2+1]
+            result[i, j] = np.max(window)
+    
+    return result
+
+def background_removal(image):
+    """배경 제거 함수 - CPU 최적화 버전"""
+    # 동적 커널 크기 계산
+    blur_radius = max(5, min(image.shape) // 10)
+    if blur_radius % 2 == 0:
+        blur_radius += 1
+    
+    # 가우시안 블러
+    blurred = cv2.GaussianBlur(image, (blur_radius, blur_radius), 1)
+    
+    # 최적화된 모폴로지 연산
+    kernel_size = 3
+    for _ in range(5):
+        blurred = _apply_morphology(blurred, kernel_size)
+    
+    # 차이 계산
+    return cv2.absdiff(image, blurred)
+
 class SceneTextDataset:
     def __init__(self, root_dir, split='train', image_size=2048, crop_size=1024, 
                  ignore_under_threshold=10, drop_under_threshold=1,
@@ -393,7 +634,6 @@ class SceneTextDataset:
         vertices = np.array(vertices, dtype=np.float32)
         labels = np.array(labels, dtype=np.int64)
 
-
         vertices, labels = filter_vertices(
             vertices,
             labels,
@@ -402,9 +642,14 @@ class SceneTextDataset:
         )
 
         image = Image.open(image_fpath)
+        # 전처리 적용
+        # image = preprocess_receipt(image)
+        # 30% 확률로 상하 반전 (필요한 경우)
+        if np.random.random() > 0.5:
+            image, vertices = flip_img(image, vertices, flip_type="vertical")
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
-        image, vertices = rotate_img(image, vertices)
+        image, vertices = rotate_img(image, vertices, angle_range=15)
         image, vertices = crop_img(image, vertices, labels, self.crop_size)
 
         if image.mode != 'RGB':
