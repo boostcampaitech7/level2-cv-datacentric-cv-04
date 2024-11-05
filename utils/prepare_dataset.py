@@ -11,7 +11,7 @@ def load_ufo_data(json_path):
 
 def merge_and_split_dataset(
     root_dir='../data',
-    languages=['chinese_receipt', 'japanese_receipt', 'thai_receipt', 'vietnamese_receipt','english_receipt'],
+    languages=['chinese_receipt', 'japanese_receipt', 'thai_receipt', 'vietnamese_receipt'],
     val_ratio=0.2,
     seed=42
 ):
@@ -112,7 +112,7 @@ def main(args):
     print("Preparing dataset...")
     
     # 기본 languages 리스트
-    languages = ['chinese_receipt', 'japanese_receipt', 'thai_receipt', 'vietnamese_receipt', 'english_receipt']
+    languages = ['chinese_receipt', 'japanese_receipt', 'thai_receipt', 'vietnamese_receipt']
     
     # external_data가 True일 때만 english_receipt 추가
     if args.external_data:
