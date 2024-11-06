@@ -3,7 +3,7 @@ import shutil
 import os
 
 # Define the target path for the downloaded dataset
-target_path = "/data/ephemeral/home/kenlee/level2-cv-datacentric-cv-04/data/english_receipt"
+target_path = os.path.join(os.path.dirname(__file__), "data", "sroie_receipt")
 
 # Ensure the target directory exists
 if not os.path.exists(target_path):

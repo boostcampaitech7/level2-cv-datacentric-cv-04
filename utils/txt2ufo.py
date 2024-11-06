@@ -76,7 +76,7 @@ def convert_txt_to_ufo(txt_dir, img_dir, target_img_train_dir):
 
 def main():
     # Base directories
-    base_dir = "../data/english_receipt"
+    base_dir = "../data/sroie_receipt"
     txt_dir = os.path.join(base_dir, "train/box")
     img_dir = os.path.join(base_dir, "train/img")
     
