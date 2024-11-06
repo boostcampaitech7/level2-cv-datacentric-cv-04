@@ -127,6 +127,7 @@ def main(args):
     if args.external_data:
         languages.append('english_receipt')
         languages.append('sroie_receipt')
+        languages.append('wild_receipt')
     
     result = merge_and_split_dataset(
         root_dir=data_dir,
