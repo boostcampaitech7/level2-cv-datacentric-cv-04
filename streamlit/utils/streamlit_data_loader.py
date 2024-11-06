@@ -135,6 +135,63 @@ def load_image_and_annotation(base_dir: str, lang: str, split: str, nation_dict:
     
     return None, None
 
+
+
+def load_test_image(base_dir: str, lang: str, split: str, nation_dict: dict, inference_path: str, key_suffix: str = "") -> Tuple[Image.Image, Dict]:
+    """test 데이터셋에서 이미지를 로드하고 어노테이션을 반환하는 함수
+    Args:
+        base_dir: 기본 디렉토리 경로
+        lang: 선택된 언어
+        split: train/test 선택
+        nation_dict: 언어별 폴더명 딕셔너리
+        inference_path: 추론 결과 파일 경로
+        key_suffix: selectbox의 고유 키를 위한 접미사 (기본값: "")
+    """
+    # 이미지 디렉토리 설정
+    img_dir = os.path.join(base_dir, nation_dict[lang], 'img', split)
+    
+    # 이미지 파일 리스트 가져오기
+    image_files = [f for f in os.listdir(img_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+    
+    if not image_files:
+        st.error("이미지 파일을 찾을 수 없습니다.")
+        return None, None
+    
+    # 선택할 이미지 파일명 (고유한 key 추가)
+    selected_image = st.selectbox("이미지 선택", image_files, key=f"image_select_{key_suffix}")
+    
+    if selected_image:
+        img_path = os.path.join(img_dir, selected_image)
+        
+        # OpenCV로 이미지 로드
+        image = cv2.imread(img_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # 이미지가 가로로 되어있다면 세로로 회전
+        if image.shape[1] > image.shape[0]:  # width > height
+            image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        
+        # PIL Image로 변환
+        image = Image.fromarray(image)
+        
+        # best_output.csv 파일에서 어노테이션 로드
+        try:
+            with open(inference_path) as f:
+                annotations = json.load(f)  # JSON으로 읽기
+        except Exception as e:
+            st.error(f"JSON 파일을 읽는 중 오류 발생: {e}")
+            return None, None
+        
+        # 어노테이션을 이미지 이름에 따라 가져오기
+        image_name = os.path.basename(selected_image)  # 이미지 파일 이름 추출
+        annotation = annotations['images'].get(image_name, None)  # 해당 이미지의 어노테이션 가져오기
+        
+        return image, annotation
+    
+    return None, None
+
+
+
 def draw_annotations(image, annotations):
     """이미지에 어노테이션을 그리는 함수
         input: 이미지, annotations
