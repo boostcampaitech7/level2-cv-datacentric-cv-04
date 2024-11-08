@@ -120,7 +120,7 @@ def main(args):
     
     # extra_only가 True일 때 extra data만 포함
     if args.extra_only:
-        languages = ['english_receipt','sroie_receipt']
+        languages = ['english_receipt','sroie_receipt','wild_receipt']
 
 
     # external_data가 True일 때만 english_receipt 추가

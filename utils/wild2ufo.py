@@ -88,7 +88,7 @@ def main():
     
     # Define paths
     base_dir = project_root / 'data/wild_receipt'
-    img_dir = base_dir / 'img'
+    img_dir = base_dir / 'img/train'
     ufo_dir = base_dir / 'ufo'
     
     # Create directories
