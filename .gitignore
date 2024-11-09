@@ -14,6 +14,8 @@ env/
 # Dataset
 data/
 *.csv
+CORD/
+
 
 # Output files
 predictions/
