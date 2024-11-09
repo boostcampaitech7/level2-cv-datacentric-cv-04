@@ -2,6 +2,8 @@ import os
 import shutil
 from pathlib import Path
 
+# 이미지 폴더 합치기
+
 def count_images_in_folder(folder):
     """주어진 폴더 내의 이미지 파일 개수를 세는 함수"""
     return len([f for f in os.listdir(folder) if Path(folder) / f].is_file())

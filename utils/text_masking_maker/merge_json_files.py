@@ -23,6 +23,6 @@ def merge_json_files(input_folder, output_file):
     print(f"모든 JSON 파일이 {output_file}로 병합되었습니다.")
 
 if __name__ == "__main__":
-    input_folder = "../../blur/only_blur"  # JSON 파일이 있는 폴더 경로
-    output_file = "../../blur/only_blur/merged_data.json"  # 결과 파일 경로
+    input_folder = "../../blur/only_blur"  # 종합할 JSON 파일들이 있는 폴더 경로
+    output_file = "../../blur/only_blur/merged_data.json"  # 종합된 json 파일 저장 경로
     merge_json_files(input_folder, output_file)

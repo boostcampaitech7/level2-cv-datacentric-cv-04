@@ -32,7 +32,7 @@ def detect_horizontal_lines(json_path, image_folder, output_json_path):
     print(f"필터링된 데이터가 {output_json_path}에 저장되었습니다.")
 
 if __name__ == "__main__":
-    json_path = "../data/merged_receipts/train.json"
-    image_folder = "../data/merged_receipts/images/train/"
-    output_json_path = "../data/merged_receipts/train_long_distance.json"
+    json_path = "../data/merged_receipts/train.json" # Texk masking의 target이 될 img들의 json 파일 위치
+    image_folder = "../data/merged_receipts/images/train/" # Texk masking의 target이 될 img들의 폴더 위치
+    output_json_path = "../data/merged_receipts/train_long_distance.json" # Texk masking된 이미지들의 최종 json 파일 위치
     detect_horizontal_lines(json_path, image_folder, output_json_path)
