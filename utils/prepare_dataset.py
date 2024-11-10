@@ -120,13 +120,14 @@ def main(args):
     
     # extra_only가 True일 때 extra data만 포함
     if args.extra_only:
-        languages = ['english_receipt','sroie_receipt']
+        languages = ['english_receipt','sroie_receipt','wild_receipt']
 
 
     # external_data가 True일 때만 english_receipt 추가
     if args.external_data:
         languages.append('english_receipt')
         languages.append('sroie_receipt')
+        languages.append('wild_receipt')
     
     result = merge_and_split_dataset(
         root_dir=data_dir,
