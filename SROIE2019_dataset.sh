@@ -12,6 +12,7 @@ pip install kagglehub
 
 # Step 2: Run the Python script to download the dataset
 echo "Running download script..."
+cd utils
 python "$PYTHON_SCRIPT"
-
+cd ..
 echo "Dataset download complete!"
