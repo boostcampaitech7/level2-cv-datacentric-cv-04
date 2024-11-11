@@ -26,7 +26,8 @@ def parse_args():
     parser = ArgumentParser()
 
     # Conventional args
-    parser.add_argument('--data_dir', default=os.environ.get('SM_CHANNEL_EVAL', 'data'))
+    # parser.add_argument('--data_dir', default=os.environ.get('SM_CHANNEL_EVAL', 'data'))
+    parser.add_argument('--data_dir', type=str,default="./up2x_results/data")
     parser.add_argument('--model_dir', default=os.environ.get('SM_CHANNEL_MODEL', 'trained_models'))
     parser.add_argument('--output_dir', default=os.environ.get('SM_OUTPUT_DATA_DIR', 'predictions'))
 
@@ -86,12 +87,14 @@ def do_inference(model, ckpt_fpath, data_dir, input_size, batch_size, split='tes
             images = []
 
     if len(images):
-        bboxes = detect(model, images, input_size)
-        by_sample_bboxes.extend(bboxes)
+        by_sample_bboxes.extend(detect(model, images, input_size))
+            
 
     ufo_result = dict(images=dict())
     for image_fname, bboxes in zip(image_fnames, by_sample_bboxes):
-        words_info = {idx: dict(points=bbox.tolist()) for idx, bbox in enumerate(bboxes)}
+        
+        words_info = {idx: dict(points=(bbox/2).tolist()) for idx, bbox in enumerate(bboxes)}
+        print(f" words_info { words_info}")
         ufo_result['images'][image_fname] = dict(words=words_info)
 
     return ufo_result
@@ -101,7 +104,7 @@ def main(args):
     model = EAST(pretrained=False).to(args.device)
 
     # Get paths to checkpoint files
-    ckpt_fpath = osp.join(args.model_dir, 'full_gradiant_100/epoch_70.pth')
+    ckpt_fpath = osp.join(args.model_dir, 'epoch_70.pth')
 
     if not osp.exists(args.output_dir):
         os.makedirs(args.output_dir)
@@ -112,8 +115,8 @@ def main(args):
     split_result = do_inference(model, ckpt_fpath, args.data_dir, args.input_size,
                               args.batch_size, split='test')  # output_dir 인자 추가
     ufo_result['images'].update(split_result['images'])
-
-    output_fname = 'full_gradiant_100_epoch_70.csv'
+ 
+    output_fname = 'best_output.csv'
     with open(osp.join(args.output_dir, output_fname), 'w') as f:
         json.dump(ufo_result, f, indent=4)
 

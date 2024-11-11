@@ -23,69 +23,16 @@ from deteval import calc_deteval_metrics # DeTEval import 추가
 from utils.utils import get_pred_bboxes, get_gt_bboxes
 import json
 
-
-#validation visualization을 위한 import
-import numpy as np
-from PIL import Image
-import matplotlib.pyplot as plt
-import torchvision.transforms as transforms
-import cv2
-
-def visualize_predictions(image, score_map, geo_map, threshold=0.9):
-    """예측 결과를 시각화하는 함수"""
-    score_map = score_map[0].cpu().numpy()
-    geo_map = geo_map[0].cpu().numpy().transpose((1, 2, 0))
-    
-    # 원본 이미지를 numpy 배열로 변환
-    image = image[0].cpu().numpy().transpose((1, 2, 0))
-    # 정규화된 이미지를 원래 스케일로 복원
-    image = ((image * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]) * 255).astype(np.uint8)
-    
-    # 점수가 threshold보다 높은 영역 찾기
-    score_mask = score_map[0] > threshold
-    
-    # 바운딩 박스 그리기
-    visualization = image.copy()
-    if score_mask.any():
-        for y, x in zip(*np.where(score_mask)):
-            # EAST 모델의 기하학적 맵에서 바운딩 박스 정보 추출
-            angle = geo_map[y, x, 4]
-            cos_angle = np.cos(angle)
-            sin_angle = np.sin(angle)
-            
-            # 각 방향의 거리
-            d1, d2, d3, d4 = geo_map[y, x, :4]
-            
-            # 바운딩 박스의 네 꼭지점 계산
-            p1 = (x - d1 * cos_angle, y - d1 * sin_angle)
-            p2 = (x + d2 * (-sin_angle), y + d2 * cos_angle)
-            p3 = (x + d3 * cos_angle, y + d3 * sin_angle)
-            p4 = (x - d4 * (-sin_angle), y - d4 * cos_angle)
-            
-            # 바운딩 박스 그리기
-            points = np.array([p1, p2, p3, p4], dtype=np.int32)
-            cv2.polylines(visualization, [points], True, (0, 255, 0), 2)
-    
-    return visualization
-
-def save_visualization(vis_img, epoch, batch_idx, save_dir='visualization_results'):
-    """시각화 결과를 저장하는 함수"""
-    # 저장 디렉토리 생성
-    os.makedirs(save_dir, exist_ok=True)
-    epoch_dir = os.path.join(save_dir, f'epoch_{epoch+1}')
-    os.makedirs(epoch_dir, exist_ok=True)
-    
-    # 이미지 저장
-    save_path = os.path.join(epoch_dir, f'batch_{batch_idx}.png')
-    cv2.imwrite(save_path, cv2.cvtColor(vis_img, cv2.COLOR_RGB2BGR))
-    return save_path
+# from PIL import Image
+# #
+# Image.MAX_IMAGE_PIXELS = None  #  disables the warning 
 
 def parse_args():
     parser = ArgumentParser()
 
     # Conventional args
     parser.add_argument('--data_dir', type=str,
-                        default=os.environ.get('SM_CHANNEL_TRAIN', 'data'))
+                        default="./up2x_results/data") # os.environ.get('SM_CHANNEL_TRAIN', 'data')
     parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR',
                                                                         'trained_models'))
     parser.add_argument('--pretrained_model', type=str, default=None,
@@ -93,10 +40,10 @@ def parse_args():
     parser.add_argument('--device', default='cuda' if cuda.is_available() else 'cpu')
     parser.add_argument('--num_workers', type=int, default=8)
 
-    parser.add_argument('--image_size', type=int, default=2048)
-    parser.add_argument('--input_size', type=int, default=1024)
-    parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--learning_rate', type=float, default=1e-3)#1e-3)
+    parser.add_argument('--image_size', type=int, default=4096) # 2048
+    parser.add_argument('--input_size', type=int, default=2048) # 1024
+    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--learning_rate', type=float, default=1e-4)#1e-3)
     parser.add_argument('--max_epoch', type=int, default=100)
     parser.add_argument('--save_interval', type=int, default=5)
     # Arguments related to Recall, Precision, F1-Score Evaluation
@@ -104,9 +51,9 @@ def parse_args():
     parser.add_argument('--start_evaluation', type=int, default=60, help='Evaluation of Recall, Precision, F1-Score is started from this epoch')
     parser.add_argument('--evaluation_interval', type=int, default=5, help='Sets interval for calculating Recall, Precision, F1-Score. Calculated from args.start_evaluation epoch')
     # Wandb 관련 인자 추가
-    parser.add_argument('--wandb_project', type=str, default='EAST_MetricCheck')
+    parser.add_argument('--wandb_project', type=str, default='EAST_t1')
     parser.add_argument('--wandb_entity', type=str, default='cv_04_data_centric')
-    parser.add_argument('--run_name', type=str, default='t15_before_upload')
+    parser.add_argument('--run_name', type=str, default='upscaling_t1')
     
 
     args = parser.parse_args()
@@ -170,6 +117,8 @@ def check_loss_errors(extra_info, img, epoch, phase="train"):
             return True
     return False
 
+
+
 def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval, pretrained_model, **kwargs):
     
@@ -180,8 +129,9 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
     except FileNotFoundError:
         print("wandb_config.yaml 파일을 찾을 수 없습니다. 기본 설정을 사용합니다.")
         wandb_config = {
-            "project": "EAST-Text-Detection",
-            "name": "EAST-training"
+            "project": "EAST_t1",#project name,
+            #"name": "EAST-training1", # each experiment name 
+            "entity": "cv_04_data_centric"  # team name
         }
 
     # run_name 설정
@@ -202,8 +152,8 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
             "input_size": input_size,
             "optimizer": "Adam",
             "scheduler": "MultiStepLR",
-            #"scheduler_milestones": [max_epoch // 2],
-            "scheduler_gamma": 0.1,
+            "scheduler_milestones": [[max_epoch // 4, max_epoch // 2, max_epoch // 4 * 3]],
+            "scheduler_gamma": 0.25,
         }
     )
 
@@ -268,7 +218,7 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
         print('Loading base model')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     # 0.001 -> 0.00025 -> 0.0000625
-    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 2], gamma=0.1)
+    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[max_epoch // 4, max_epoch // 2, max_epoch // 4 * 3], gamma=0.25)
 
     model.train()
     for epoch in range(max_epoch):
@@ -282,15 +232,10 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                 pbar.set_description(f'[Epoch {epoch + 1}]')
                 
                 loss, extra_info = model.train_step(img, gt_score_map, gt_geo_map, roi_mask)
-                
-                # 에러 체크
-                if check_loss_errors(extra_info, img, epoch, "train"):
-                    continue
-                
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-
+                # print("###",loss,extra_info['cls_loss'] , extra_info['angle_loss'],extra_info['iou_loss'])
                 loss_val = loss.item()
                 epoch_loss += loss_val
                 epoch_cls_loss += extra_info['cls_loss']
@@ -304,74 +249,6 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                     'IoU loss': extra_info['iou_loss']
                 }
                 pbar.set_postfix(val_dict)
-        # 트레이닝 평균 손실 계산
-        mean_epoch_loss = epoch_loss / num_batches
-        mean_epoch_cls_loss = epoch_cls_loss / num_batches
-        mean_epoch_angle_loss = epoch_angle_loss / num_batches
-        mean_epoch_iou_loss = epoch_iou_loss / num_batches
-
-        print(f'\nTraining metrics - Loss: {mean_epoch_loss:.4f}, Cls: {mean_epoch_cls_loss:.4f}, '
-              f'Angle: {mean_epoch_angle_loss:.4f}, IoU: {mean_epoch_iou_loss:.4f}')
-
-        # 트레이닝 메트릭 로깅
-        wandb.log({
-            "train_loss": mean_epoch_loss,
-            "train_cls_loss": mean_epoch_cls_loss,
-            "train_angle_loss": mean_epoch_angle_loss,
-            "train_iou_loss": mean_epoch_iou_loss,
-            "learning_rate": optimizer.param_groups[0]['lr'],
-            "epoch": epoch + 1
-        })
-
-        # Validation phase
-        model.eval()
-        val_loss = 0
-        val_cls_loss = 0
-        val_angle_loss = 0
-        val_iou_loss = 0
-
-        with torch.no_grad():
-            with tqdm(total=num_val_batches, desc='Validation') as val_pbar:
-                for img, gt_score_map, gt_geo_map, roi_mask in val_loader:
-                    img, gt_score_map = img.to(device), gt_score_map.to(device)
-                    gt_geo_map, roi_mask = gt_geo_map.to(device), roi_mask.to(device)
-
-                    loss, extra_info = model.train_step(img, gt_score_map, gt_geo_map, roi_mask)
-                    
-                    # 에러 체크
-                    if check_loss_errors(extra_info, img, epoch, "validation"):
-                        continue
-                    
-                    val_loss += loss.item()
-                    val_cls_loss += extra_info['cls_loss']
-                    val_angle_loss += extra_info['angle_loss']
-                    val_iou_loss += extra_info['iou_loss']
-
-                    val_pbar.update(1)
-                    val_pbar.set_postfix({
-                        'Val Cls loss': extra_info['cls_loss'],
-                        'Val Angle loss': extra_info['angle_loss'],
-                        'Val IoU loss': extra_info['iou_loss']
-                    })
-
-        # Validation 평균 손실 계산
-        mean_val_loss = val_loss / num_val_batches
-        mean_val_cls_loss = val_cls_loss / num_val_batches
-        mean_val_angle_loss = val_angle_loss / num_val_batches
-        mean_val_iou_loss = val_iou_loss / num_val_batches
-
-        print(f'Validation metrics - Loss: {mean_val_loss:.4f}, Cls: {mean_val_cls_loss:.4f}, '
-              f'Angle: {mean_val_angle_loss:.4f}, IoU: {mean_val_iou_loss:.4f}')
-
-
-        # Validation 메트릭 로깅
-        wandb.log({
-            "val_loss": mean_val_loss,
-            "val_cls_loss": mean_val_cls_loss,
-            "val_angle_loss": mean_val_angle_loss,
-            "val_iou_loss": mean_val_iou_loss,
-            "epoch": epoch + 1
-        })    
 
                 
         # 트레이닝 평균 손실 계산

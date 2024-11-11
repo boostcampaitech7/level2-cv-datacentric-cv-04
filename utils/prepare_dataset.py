@@ -3,6 +3,7 @@ import os
 import random
 from pathlib import Path
 import shutil
+from argparse import ArgumentParser
 
 def load_ufo_data(json_path):
     with open(json_path, 'r', encoding='utf-8') as f:
@@ -107,13 +108,45 @@ def merge_and_split_dataset(
         'val_size': len(val_images)
     }
 
+def main(args):
+    print("Preparing dataset...")
+    
+    # Convert relative path to absolute path based on script location
+    script_dir = Path(__file__).parent
+    data_dir = (script_dir.parent / 'data').resolve()
+    
+    # 기본 languages 리스트
+    languages = ['chinese_receipt', 'japanese_receipt', 'thai_receipt', 'vietnamese_receipt']
+    
+    # extra_only가 True일 때 extra data만 포함
+    if args.extra_only:
+        languages = ['english_receipt','sroie_receipt','wild_receipt']
+
+
+    # external_data가 True일 때만 english_receipt 추가
+    if args.external_data:
+        languages.append('english_receipt')
+        languages.append('sroie_receipt')
+        languages.append('wild_receipt')
+    
+    result = merge_and_split_dataset(
+        root_dir=data_dir,
+        languages=languages,
+        val_ratio=args.val_ratio,
+        seed=args.seed
+    )
+    
+    print(f"\nDataset preparation completed!")
+    print(f"Train set size: {result['train_size']}")
+    print(f"Validation set size: {result['val_size']}")
+
 if __name__ == '__main__':
-    try:
-        result = merge_and_split_dataset()
-        print(f"\n데이터 분할 완료:")
-        print(f"학습 데이터: {result['train_size']}개")
-        print(f"검증 데이터: {result['val_size']}개")
-    except Exception as e:
-        print(f"Error occurred: {str(e)}")
-        import traceback
-        traceback.print_exc()
+    parser = ArgumentParser()
+    parser.add_argument('--data_dir', type=str, help='Override default data directory if needed')
+    parser.add_argument('--val_ratio', type=float, default=0.2)
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--external_data', action='store_true', help='Include english receipt data')
+    parser.add_argument('--extra_only', action='store_true', help='Include only extra data')
+    
+    args = parser.parse_args()
+    main(args)
