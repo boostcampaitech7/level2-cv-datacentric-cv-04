@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 from utils.streamlit_data_loader import load_image_and_annotation
-from utils.preprocessing import resize_img, adjust_height, rotate_img, crop_img, preprocess_receipt, clean_background
+from utils.preprocessing import resize_img, adjust_height, improved_background_removal_rgb,rotate_img, crop_img, detect_receipt, lab_processing, hsv_processing, color_processing, preprocess_receipt
 from utils.streamlit_data_loader import draw_boxes, get_preprocessing_stats
 import cv2
 
@@ -12,7 +12,6 @@ def main():
     
     st.title("전처리 과정 시각화")
     
-
     nation_dict = {
         '베트남어': 'vietnamese_receipt',
         '태국어': 'thai_receipt',
@@ -86,15 +85,32 @@ def main():
         # 원본
         steps.append(("원본 이미지", image, vertices))
         
-        # 영수증 전처리 추가
+        converted_lab_image = lab_processing(image)
+        steps.append(("LAB 변환 후", converted_lab_image, vertices))
+        
+        converted_hsv_image = hsv_processing(image)
+        steps.append(("HSV 변환 후", converted_hsv_image, vertices))
+
+        converted_image = color_processing(image)
+        steps.append(("색공간 변환 후", converted_image, vertices))
+        
+        edges = edge_processing(image)
+        steps.append(("엣지 검출 후", edges, vertices))
+        
+        # # 영수증 전처리 추가
         preprocessed = preprocess_receipt(image)
         steps.append(("영수증 전처리 후", preprocessed, vertices))
+        result = preprocess_receipt(image)
+        steps.append(("영수증 전처리 후", result, vertices))
+        
+        improved_background_removal_image = improved_background_removal_rgb(image)
+        steps.append(("개선된 배경 제거 후", improved_background_removal_image, vertices))
 
-        masked_image = clean_background(preprocessed)   
-        steps.append(("영수증 마스크 후", masked_image, vertices))
+        masked_image = detect_receipt(converted_image)   
+        steps.append(("경계 검출 후", masked_image, vertices)) 
         
         # 리사이즈
-        resized_img, resized_vertices = resize_img(preprocessed, vertices, image_size)
+        resized_img, resized_vertices = resize_img(Image.fromarray(converted_image), vertices, image_size)
         steps.append(("리사이즈 후", resized_img, resized_vertices))
         
         # 높이 조정
@@ -105,7 +121,6 @@ def main():
         rotated_img, rotated_vertices = rotate_img(adjusted_img, adjusted_vertices, angle_range)
         steps.append(("회전 후", rotated_img, rotated_vertices))
         
-
         # 크롭
         crop_size = min(crop_size, rotated_img.size[0], rotated_img.size[1])  # 이미지 크기에 맞게 조정
         cropped_img, cropped_vertices = crop_img(rotated_img, rotated_vertices, labels, crop_size)
