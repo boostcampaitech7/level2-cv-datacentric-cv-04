@@ -260,224 +260,51 @@ def background_removal(image):
     # 차이 계산
     return cv2.absdiff(image, blurred)
 
-# 추가: 메모리 캐시 및 스트림 관리
-# cv2.cuda.setDevice(0)
-# cv2.cuda.Stream.Null.synchronize()
-# def lab_processing(img_array):
-#     # PIL Image를 numpy array로 변환
-#     if isinstance(img_array, Image.Image):
-#         img_array = np.array(img_array)
-        
-#     # L*a*b* 색공간으로 변환
-#     lab = cv2.cvtColor(img_array, cv2.COLOR_BGR2LAB)
-#     l, a, b = cv2.split(lab)
-    
-#     #L채널에 대해 CLAHE 적용
-#     #clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-#     #enhanced_l = clahe.apply(l)
-#     enhanced_l = l
-        
-#     # 흰색 픽셀 (L이 높고, a와 b가 중간값에 가까움)
-#     white_mask = (enhanced_l > 90) & (np.abs(a) < 155) & (np.abs(b) < 155) 
-    
-#     # 검은색 픽셀 (L이 낮음)
-#     black_mask = (enhanced_l < 1)
-    
-#     # 흰색과 검은색 픽셀만 남기고 나머지는 0으로
-#     l = np.where(white_mask | black_mask, enhanced_l, 0)
 
-#     return l
-
-# def hsv_processing(img_array):
-#     # PIL Image를 numpy array로 변환
-#     if isinstance(img_array, Image.Image):
-#         img_array = np.array(img_array)
+def find_optimal_threshold(gray_image):
+    """히스토그램 분포를 그대로 활용하여 최적 임계값 찾기"""
+    # 히스토그램 계산
+    hist = cv2.calcHist([gray_image], [0], None, [256], [0, 256]).flatten()
     
-#     # 이미지가 그레이스케일인 경우 BGR로 변환
-#     if len(img_array.shape) == 2:
-#         img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2BGR)
+    # 픽셀 총 개수
+    total_pixels = gray_image.shape[0] * gray_image.shape[1]
     
-#     # HSV 색공간으로 변환
-#     hsv = cv2.cvtColor(img_array, cv2.COLOR_BGR2HSV)
-#     h, s, v = cv2.split(hsv)
+    # 각 밝기값의 비율 계산
+    pixel_probabilities = hist / total_pixels
     
-#     enhanced_v = v
+    max_variance = 0
+    optimal_threshold = 0
     
-#     # 흰색 픽셀 (채도가 낮고 명도가 높은 픽셀)
-#     white_mask = (s < 100) & (enhanced_v > 10)
-    
-#     # 검은색 픽셀 (명도가 낮은 픽셀)
-#     black_mask = (enhanced_v < 1)
-    
-#     # 흰색과 검은색 픽셀만 강조
-#     result = np.where(white_mask | black_mask, enhanced_v, 0)
-    
-#     return result
-
-# def edge_processing(image):
-#     image = np.array(image)
-    
-#     # 기존 전처리 코드
-#     #img_array = (((lab_processing(image).astype(np.float32)*0.6 + 
-#     #              hsv_processing(image).astype(np.float32))*0.4)/2).astype(np.uint8)
-    
-#     #기존 전처리 코드
-#     img_array = ((improved_background_removal(lab_processing(image).astype(np.float32)) + 
-#                   improved_background_removal(hsv_processing(image).astype(np.float32)))).astype(np.uint8)
-    
-#     # # 히스토그램 분포 기반 최적 임계값 찾기
-#     # threshold = find_optimal_threshold(img_array)
-    
-#     # if threshold == 0:
-#     #     return img_array
-    
-#     # # 이진화 적용
-#     # _, binary = cv2.threshold(img_array, threshold, 255, cv2.THRESH_BINARY)
-    
-#     # # 윤곽선 검출
-#     # contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-#     # # 윤곽선을 그리기 위한 빈 이미지 생성
-#     # contour_image = np.zeros_like(binary)
-    
-#     # # # 모든 윤곽선 그리기
-#     # # kernel = np.ones((5,5), np.uint8)
-#     # # #contour_image = cv2.morphologyEx(contour_image, cv2.MORPH_CLOSE, kernel)  
-#     # cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 2)
-
-#     # # 1. 이미지 블렌딩으로 배경 추정
-#     # blur_radius = max(5, min(img_array.shape) // 20)  # 이미지 크기에 따른 동적 커널 크기
-#     # if blur_radius % 2 == 0:
-#     #     blur_radius += 1  # 커널 크기는 홀수여야 함
-        
-#     # blurred = cv2.GaussianBlur(img_array, (blur_radius, blur_radius), 1)
-
-#     # rectKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
-#     # dilated = cv2.dilate(blurred, rectKernel)
-#     # #blurred = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=1)
-#     # # 2. 원본과 블러된 이미지의 차이 계산
-#     # diff = cv2.absdiff(image, dilated)
-
-#     return img_array
-
-# def find_optimal_threshold(gray_image):
-#     """히스토그램 분포를 그대로 활용하여 최적 임계값 찾기"""
-#     # 히스토그램 계산
-#     hist = cv2.calcHist([gray_image], [0], None, [256], [0, 256]).flatten()
-    
-#     # 픽셀 총 개수
-#     total_pixels = gray_image.shape[0] * gray_image.shape[1]
-    
-#     # 각 밝기값의 비율 계산
-#     pixel_probabilities = hist / total_pixels
-    
-#     max_variance = 0
-#     optimal_threshold = 0
-    
-#     # 평균 밝기와 표준편차 계산
-#     mean_brightness = np.sum(np.arange(256) * pixel_probabilities)
-#     # 이미지의 밝기 특성에 따라 패널티 강도 조정
-#     if mean_brightness > 180:  # 매우 밝은 이미지
-#         return 0
+    # 평균 밝기와 표준편차 계산
+    mean_brightness = np.sum(np.arange(256) * pixel_probabilities)
+    # 이미지의 밝기 특성에 따라 패널티 강도 조정
+    if mean_brightness > 180:  # 매우 밝은 이미지
+        return 0
         
     
-#     # 모든 가능한 임계값에 대해 검사
-#     for threshold in range(256):
-#         # 임계값을 기준으로 두 클래스로 분할
-#         w0 = np.sum(pixel_probabilities[:threshold])
-#         w1 = 1 - w0
+    # 모든 가능한 임계값에 대해 검사
+    for threshold in range(256):
+        # 임계값을 기준으로 두 클래스로 분할
+        w0 = np.sum(pixel_probabilities[:threshold])
+        w1 = 1 - w0
         
-#         # 가중치가 0인 경우 스킵
-#         if w0 == 0 or w1 == 0:
-#             continue
+        # 가중치가 0인 경우 스킵
+        if w0 == 0 or w1 == 0:
+            continue
         
-#         # 각 클래스의 평균 계산
-#         mu0 = np.sum(np.arange(threshold) * pixel_probabilities[:threshold]) / w0
-#         mu1 = np.sum(np.arange(threshold, 256) * pixel_probabilities[threshold:]) / w1
+        # 각 클래스의 평균 계산
+        mu0 = np.sum(np.arange(threshold) * pixel_probabilities[:threshold]) / w0
+        mu1 = np.sum(np.arange(threshold, 256) * pixel_probabilities[threshold:]) / w1
         
-#         # 클래스 간 분산 계산
-#         variance = w0 * w1 * (mu0 - mu1) ** 2
+        # 클래스 간 분산 계산
+        variance = w0 * w1 * (mu0 - mu1) ** 2
         
-#         # 최대 분산을 가지는 임계값 저장
-#         if variance > max_variance:
-#             max_variance = variance
-#             optimal_threshold = threshold
+        # 최대 분산을 가지는 임계값 저장
+        if variance > max_variance:
+            max_variance = variance
+            optimal_threshold = threshold
     
-#     return optimal_threshold
-
-
-# def preprocess_receipt(image):
-#     """영수증 이미지 전처리 함수
-    
-#     Args:
-#         image: numpy array 형식의 입력 이미지
-#     Returns:
-#         contour_image_rgb: 윤곽선이 그려진 컬러 이미지
-#     """
-#     image = np.array(image)
-#     # 기존 전처리 코드
-#     img_array = (((lab_processing(image).astype(np.float32)*0.7 + 
-#                   hsv_processing(image).astype(np.float32))*0.3)/3).astype(np.uint8)
-    
-#     #기존 전처리 코드
-#     img_array += ((improved_background_removal(lab_processing(image).astype(np.float32)) + 
-#                   improved_background_removal(hsv_processing(image).astype(np.float32)))/2).astype(np.uint8)
-    
-    #img_array += ((image[:,:,0] + image[:,:,1] + image[:,:,2])/3).astype(np.uint8)
-    # blurred = cv2.GaussianBlur(img_array, (5, 5), 0)
-    # rectKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
-    # dilated = cv2.dilate(blurred, rectKernel)
-     # 패딩 추가
-    # pad_size = 20  # 원하는 패딩 크기 설정
-    # padded_img = cv2.copyMakeBorder(img_array, 
-    #                                pad_size, pad_size, pad_size, pad_size,
-    #                                cv2.BORDER_CONSTANT,
-    #                                value=[255, 255, 255])  # 흰색 패딩
-
-
-    # # 히스토그램 분포 기반 최적 임계값 찾기
-    # threshold = find_optimal_threshold(img_array)
-    
-    # if threshold == 0:
-    #     return img_array
-    
-
-    # # 이진화 적용
-    # _, binary = cv2.threshold(img_array, threshold, 255, cv2.THRESH_BINARY)
-    
-    # # 윤곽선 검출
-    # contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    # # 윤곽선을 그리기 위한 빈 이미지 생성
-    # contour_image = np.zeros_like(binary)
-    
-    # # # 모든 윤곽선 그리기
-    # # kernel = np.ones((5,5), np.uint8)
-    # # #contour_image = cv2.morphologyEx(contour_image, cv2.MORPH_CLOSE, kernel)  
-    # cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 2)
-    
-
-    # # 마스크 초기화
-    # mask = np.zeros(image.shape[:2], dtype=np.uint8)
-    
-    # if contours:
-    #     # 가장 큰 윤곽선 찾기
-    #     largest_contour = max(contours, key=cv2.contourArea)
-        
-    #     # 윤곽선의 면적이 전체 이미지 면적의 1% 이상인 경우에만 마스크 생성
-    #     min_area = image.shape[0] * image.shape[1] * 0.01
-    #     if cv2.contourArea(largest_contour) > min_area:
-    #         # 마스크에 윤곽선 그리기
-    #         cv2.drawContours(mask, [largest_contour], -1, 255, -1)
-    
-    # # 마스크가 비어있는 경우 (윤곽선이 없거나 너무 작은 경우)
-    # if not np.any(mask):
-    #     mask = np.ones(image.shape[:2], dtype=np.uint8) * 255
-    
-    # # 마스크 적용
-    # masked_image = cv2.bitwise_and(image, image, mask=mask)
-    
-    return img_array
+    return optimal_threshold
     
 def get_receipt_contour(contours):
     """영수증 윤곽선을 찾는 함수
@@ -520,28 +347,6 @@ def color_processing(image):
     
     return img_array
 
-# def improved_background_removal(image):
-#     """
-#     이미지 블렌딩과 적응형 임계값을 결합한 배경 제거
-    
-#     Args:
-#         image: 입력 그레이스케일 이미지
-#     Returns:
-#         처리된 이미지
-#     """
-#     # 1. 이미지 블렌딩으로 배경 추정
-#     blur_radius = max(5, min(image.shape) // 10)  # 이미지 크기에 따른 동적 커널 크기
-#     if blur_radius % 2 == 0:
-#         blur_radius += 1  # 커널 크기는 홀수여야 함
-        
-#     blurred = cv2.GaussianBlur(image, (blur_radius, blur_radius), 1)
-#     blurred = cv2.morphologyEx(blurred, cv2.MORPH_CLOSE, np.ones((3,3), np.uint8), iterations=5)
-
-#     # 2. 원본과 블러된 이미지의 차이 계산
-#     diff = cv2.absdiff(image, blurred)
-    
-#     return diff
-
 def improved_background_removal_rgb(image):
     result = preprocess_receipt(image)
     result = 255 - cv2.cvtColor(result, cv2.COLOR_GRAY2RGB)
@@ -573,17 +378,10 @@ def select_receipt(image):
     blurred = cv2.GaussianBlur(image, (5, 5), 0)
     rectKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
     dilated = cv2.dilate(blurred, rectKernel)
-    #_, binary = cv2.threshold(dilated, 120, 255, cv2.THRESH_BINARY)
-    # 엣지 검출 (Canny)
-    #edges = cv2.Canny(binary, 50, 150)
-    #edged = cv2.Canny(dilated, 100, 100, apertureSize=3)
-    edges = cv2.Laplacian(blurred, cv2.CV_64F)
+    edges = cv2.Laplacian(dilated, cv2.CV_64F)
     edges = np.uint8(np.absolute(edges))
     #edges = 255 - edges
     edges = cv2.Canny(edges, 50, 150, apertureSize=5)
-    
-    #kernel = np.ones((3,3), np.uint8)
-    #connected = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=1)
     
     # 윤곽선 검출
     contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -608,10 +406,6 @@ def draw_contours(image):
     blurred = cv2.GaussianBlur(image, (5, 5), 0)
     rectKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
     dilated = cv2.dilate(blurred, rectKernel)
-    #_, binary = cv2.threshold(dilated, 120, 255, cv2.THRESH_BINARY)
-    # 엣지 검출 (Canny)
-    #edges = cv2.Canny(binary, 50, 150)
-    #edged = cv2.Canny(dilated, 100, 100, apertureSize=3)
     edges = cv2.Laplacian(blurred, cv2.CV_64F)
     edges = np.uint8(np.absolute(edges))
     edges = 255 - edges
@@ -668,10 +462,6 @@ def detect_rectangle(image):
     blurred = cv2.GaussianBlur(image, (5, 5), 0)
     rectKernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
     dilated = cv2.dilate(blurred, rectKernel)
-    #_, binary = cv2.threshold(dilated, 120, 255, cv2.THRESH_BINARY)
-    # 엣지 검출 (Canny)
-    #edges = cv2.Canny(binary, 50, 150)
-    #edged = cv2.Canny(dilated, 100, 100, apertureSize=3)
     edges = cv2.Laplacian(blurred, cv2.CV_64F)
     edges = np.uint8(np.absolute(edges))
     edges = 255 - edges

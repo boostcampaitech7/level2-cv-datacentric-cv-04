@@ -59,25 +59,25 @@ def main():
         vertices = []
         labels = []
         
-        # # annotations 구조 처리 방식 수정
-        # if isinstance(annotations, dict):
-        #     if 'words' in annotations:  # train 데이터 형식
-        #         for word_info in annotations['words'].values():
-        #             if isinstance(word_info, dict) and 'points' in word_info:
-        #                 vertices.append(np.array(word_info['points']).reshape(-1))
-        #                 labels.append(1)  # 텍스트 영역은 1로 표시
-        #     elif 'annotations' in annotations:  # test 데이터 형식
-        #         for anno in annotations['annotations']:
-        #             if 'points' in anno:
-        #                 vertices.append(np.array(anno['points']).reshape(-1))
-        #                 labels.append(1)
+        # annotations 구조 처리 방식 수정
+        if isinstance(annotations, dict):
+            if 'words' in annotations:  # train 데이터 형식
+                for word_info in annotations['words'].values():
+                    if isinstance(word_info, dict) and 'points' in word_info:
+                        vertices.append(np.array(word_info['points']).reshape(-1))
+                        labels.append(1)  # 텍스트 영역은 1로 표시
+            elif 'annotations' in annotations:  # test 데이터 형식
+                for anno in annotations['annotations']:
+                    if 'points' in anno:
+                        vertices.append(np.array(anno['points']).reshape(-1))
+                        labels.append(1)
 
         vertices = np.array(vertices) if vertices else np.array([])
         labels = np.array(labels)
 
-        # if len(vertices) == 0:
-        #     st.error("이미지에서 텍스트 영역을 찾을 수 없습니다.")
-        #     return
+        if len(vertices) == 0:
+            st.error("이미지에서 텍스트 영역을 찾을 수 없습니다.")
+            return
         
         # 전처리 단계별 처리
         steps = []
@@ -94,28 +94,20 @@ def main():
         converted_image = color_processing(image)
         steps.append(("색공간 변환 후", converted_image, vertices))
         
-        # edges = edge_processing(image)
-        # steps.append(("엣지 검출 후", edges, vertices))
+        edges = edge_processing(image)
+        steps.append(("엣지 검출 후", edges, vertices))
         
-        # # # 영수증 전처리 추가
-        # preprocessed = preprocess_receipt(image)
-        # steps.append(("영수증 전처리 후", preprocessed, vertices))
+        # # 영수증 전처리 추가
+        preprocessed = preprocess_receipt(image)
+        steps.append(("영수증 전처리 후", preprocessed, vertices))
         result = preprocess_receipt(image)
         steps.append(("영수증 전처리 후", result, vertices))
         
         improved_background_removal_image = improved_background_removal_rgb(image)
         steps.append(("개선된 배경 제거 후", improved_background_removal_image, vertices))
-        # masked_image = detect_receipt(converted_image)   
-        # steps.append(("경계 검출 후", masked_image, vertices)) 
 
-        # selected_image = select_receipt(converted_image)
-        # steps.append(("윤곽선 선택 후", selected_image, vertices))
-        
-        # draw_contours_image = draw_contours(converted_image)
-        # steps.append(("윤곽선 검출 후", draw_contours_image, vertices))
-        
-        # detect_rectangle_image = detect_rectangle(converted_image)
-        # steps.append(("영수증 검출 후", detect_rectangle_image, vertices))
+        masked_image = detect_receipt(converted_image)   
+        steps.append(("경계 검출 후", masked_image, vertices)) 
         
         # 리사이즈
         resized_img, resized_vertices = resize_img(Image.fromarray(converted_image), vertices, image_size)
