@@ -9,15 +9,16 @@ import cv2
 import albumentations as A
 from torch.utils.data import Dataset
 from shapely.geometry import Polygon
-from numba import njit
 
-# 부분 컴파일을 통한 성능 향상
+from numba import njit
+from numba import jit, prange
+from concurrent.futures import ThreadPoolExecutor
 @njit
 def cal_distance(x1, y1, x2, y2):
     '''calculate the Euclidean distance'''
     return math.sqrt((x1 - x2)**2 + (y1 - y2)**2)
 
-
+@njit
 def move_points(vertices, index1, index2, r, coef):
     '''move the two points to shrink edge
     Input:
@@ -50,7 +51,7 @@ def move_points(vertices, index1, index2, r, coef):
         vertices[y2_index] += ratio * length_y
     return vertices
 
-
+@njit
 def shrink_poly(vertices, coef=0.3):
     '''shrink the text region
     Input:
@@ -80,7 +81,6 @@ def shrink_poly(vertices, coef=0.3):
     v = move_points(v, 3 + offset, 4 + offset, r, coef)
     return v
 
-
 @njit
 def get_rotate_mat(theta):
     '''positive theta value means rotate clockwise'''
@@ -103,7 +103,6 @@ def rotate_vertices(vertices, theta, anchor=None):
     res = np.dot(rotate_mat, v - anchor)
     return (res + anchor).T.reshape(-1)
 
-
 @njit
 def get_boundary(vertices):
     '''get the tight boundary around given vertices
@@ -118,7 +117,6 @@ def get_boundary(vertices):
     y_min = min(y1, y2, y3, y4)
     y_max = max(y1, y2, y3, y4)
     return x_min, x_max, y_min, y_max
-
 
 @njit
 def cal_error(vertices):
@@ -135,7 +133,7 @@ def cal_error(vertices):
           cal_distance(x3, y3, x_max, y_max) + cal_distance(x4, y4, x_min, y_max)
     return err
 
-
+@njit
 def find_min_rect_angle(vertices):
     '''find the best angle to rotate poly and obtain min rectangle
     Input:
@@ -236,6 +234,8 @@ def crop_img(img, vertices, labels, length):
     return region, new_vertices
 
 
+
+@njit
 def rotate_all_pixels(rotate_mat, anchor_x, anchor_y, length):
     '''get rotated locations of all pixels for next stages
     Input:
@@ -267,9 +267,42 @@ def resize_img(img, vertices, size):
         img = img.resize((size, int(h * ratio)), Image.BILINEAR)
     else:
         img = img.resize((int(w * ratio), size), Image.BILINEAR)
-    new_vertices = vertices * ratio
-    return img, new_vertices
+    if vertices is not None:
+        new_vertices = vertices * ratio
+        return img, new_vertices
+    else:
+        return img
 
+def flip_img(img, vertices, flip_type="horizontal"):
+    """이미지와 vertices를 좌우 또는 상하 반전
+    
+    Args:
+        img: PIL Image
+        vertices: 텍스트 영역의 좌표 (n,8) 
+        flip_type: "horizontal" 또는 "vertical"
+        
+    Returns:
+        img: 반전된 PIL Image
+        new_vertices: 반전된 vertices 좌표
+    """
+    w, h = img.width, img.height
+    
+    if flip_type == "horizontal":
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        if vertices is not None and vertices.size > 0:
+            new_vertices = vertices.copy()
+            new_vertices[:, [0,2,4,6]] = w - vertices[:, [0,2,4,6]]
+    elif flip_type == "vertical":
+        img = img.transpose(Image.FLIP_TOP_BOTTOM)
+        if vertices is not None and vertices.size > 0:
+            new_vertices = vertices.copy()
+            new_vertices[:, [1,3,5,7]] = h - vertices[:, [1,3,5,7]]
+    else:
+        raise ValueError("flip_type must be 'horizontal' or 'vertical'")
+        
+    if vertices is not None:
+        return img, new_vertices
+    return img
 
 def adjust_height(img, vertices, ratio=0.2):
     '''adjust height of image to aug data
@@ -286,10 +319,13 @@ def adjust_height(img, vertices, ratio=0.2):
     new_h = int(np.around(old_h * ratio_h))
     img = img.resize((img.width, new_h), Image.BILINEAR)
 
-    new_vertices = vertices.copy()
-    if vertices.size > 0:
-        new_vertices[:,[1,3,5,7]] = vertices[:,[1,3,5,7]] * (new_h / old_h)
-    return img, new_vertices
+    if vertices is not None:
+        new_vertices = vertices.copy()
+        if vertices.size > 0:
+            new_vertices[:,[1,3,5,7]] = vertices[:,[1,3,5,7]] * (new_h / old_h)
+        return img, new_vertices
+    else:
+        return img, None
 
 
 def rotate_img(img, vertices, angle_range=10):
@@ -337,63 +373,197 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
 
     return new_vertices, new_labels
 
+@jit(nopython=True, parallel=True)
+def _apply_mask_numba(array, mask):
+    """Numba로 최적화된 마스크 적용 함수"""
+    result = array.copy()
+    for i in prange(array.shape[0]):
+        for j in prange(array.shape[1]):
+            if not mask[i, j]:
+                result[i, j] = 0
+    return result
 
-class SceneTextDataset(Dataset):
-    def __init__(self, root_dir,
-                 split='train',
-                 image_size=2048,
-                 crop_size=1024,
-                 ignore_under_threshold=10,
-                 drop_under_threshold=1,
-                 color_jitter=True,
-                 normalize=True):
-        self._lang_list = ['chinese', 'japanese', 'thai', 'vietnamese']
+def preprocess_receipt(image):
+    """영수증 이미지 전처리 함수 - CPU 최적화 버전
+    
+    Args:
+        image: PIL.Image 또는 numpy array 형식의 입력 이미지
+    Returns:
+        PIL.Image: 처리된 이미지
+    """
+    # PIL.Image를 numpy array로 변환
+    if isinstance(image, Image.Image):
+        img_array = np.array(image)
+    else:
+        img_array = image.copy()
+
+    # ThreadPoolExecutor를 사용한 병렬 처리
+    with ThreadPoolExecutor() as executor:
+        lab_future = executor.submit(lab_processing, img_array)
+        hsv_future = executor.submit(hsv_processing, img_array)
+        
+        lab_result = lab_future.result()
+        hsv_result = hsv_future.result()
+    
+    # 벡터화된 연산으로 최적화
+    combined = np.add(
+        np.multiply(lab_result.astype(np.float32), 0.7),
+        np.multiply(hsv_result.astype(np.float32), 0.3)
+    ) / 3
+    
+    # 배경 제거 병렬 처리
+    with ThreadPoolExecutor() as executor:
+        lab_bg_future = executor.submit(background_removal, lab_result.astype(np.float32))
+        hsv_bg_future = executor.submit(background_removal, hsv_result.astype(np.float32))
+        
+        bg_removed = np.add(lab_bg_future.result(), hsv_bg_future.result()) / 2
+    
+    # 최종 결과 계산
+    result = np.add(combined, bg_removed).astype(np.uint8)
+    
+    return Image.fromarray(result)
+
+def lab_processing(img_array):
+    """LAB 색공간 기반 이미지 처리"""
+    # PIL Image를 numpy array로 변환
+    if isinstance(img_array, Image.Image):
+        img_array = np.array(img_array)
+    
+    # 그레이스케일 이미지를 BGR로 변환
+    if len(img_array.shape) == 2:
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2BGR)
+    
+    # LAB 변환
+    lab = cv2.cvtColor(img_array, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # 마스크 생성
+    mask = np.logical_or(
+        np.logical_and(
+            l > 90,
+            np.logical_and(
+                np.abs(a) < 155,
+                np.abs(b) < 155
+            )
+        ),
+        l < 1
+    )
+    
+    # Numba 최적화된 마스크 적용
+    return _apply_mask_numba(l, mask)
+
+def hsv_processing(img_array):
+    """HSV 색공간 기반 이미지 처리"""
+    # PIL Image를 numpy array로 변환
+    if isinstance(img_array, Image.Image):
+        img_array = np.array(img_array)
+    
+    # 그레이스케일 이미지를 BGR로 변환
+    if len(img_array.shape) == 2:
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2BGR)
+    
+    # HSV 변환
+    hsv = cv2.cvtColor(img_array, cv2.COLOR_BGR2HSV)
+    _, s, v = cv2.split(hsv)
+    
+    # 마스크 생성
+    mask = np.logical_or(
+        np.logical_and(s < 100, v > 10),
+        v < 1
+    )
+    
+    # Numba 최적화된 마스크 적용
+    return _apply_mask_numba(v, mask)
+
+@jit(nopython=True)
+def _apply_morphology(image, kernel_size):
+    """모폴로지 연산을 위한 Numba 최적화 함수"""
+    height, width = image.shape
+    result = np.zeros_like(image)
+    
+    for i in prange(kernel_size//2, height - kernel_size//2):
+        for j in prange(kernel_size//2, width - kernel_size//2):
+            window = image[i-kernel_size//2:i+kernel_size//2+1,
+                         j-kernel_size//2:j+kernel_size//2+1]
+            result[i, j] = np.max(window)
+    
+    return result
+
+def background_removal(image):
+    """배경 제거 함수 - CPU 최적화 버전"""
+    # 동적 커널 크기 계산
+    blur_radius = max(5, min(image.shape) // 10)
+    if blur_radius % 2 == 0:
+        blur_radius += 1
+    
+    # 가우시안 블러
+    blurred = cv2.GaussianBlur(image, (blur_radius, blur_radius), 1)
+    
+    # 최적화된 모폴로지 연산
+    kernel_size = 3
+    for _ in range(5):
+        blurred = _apply_morphology(blurred, kernel_size)
+    
+    # 차이 계산
+    return cv2.absdiff(image, blurred)
+
+class SceneTextDataset:
+    def __init__(self, root_dir, split='train', image_size=2048, crop_size=1024, 
+                 ignore_under_threshold=10, drop_under_threshold=1,
+                 color_jitter=True, normalize=True):
         self.root_dir = root_dir
         self.split = split
-        total_anno = dict(images=dict())
-        for nation in self._lang_list:
-            with open(osp.join(root_dir, '{}_receipt/ufo/{}.json'.format(nation, split)), 'r', encoding='utf-8') as f:
-                anno = json.load(f)
-            for im in anno['images']:
-                total_anno['images'][im] = anno['images'][im]
-
-        self.anno = total_anno
-        self.image_fnames = sorted(self.anno['images'].keys())
-
-        self.image_size, self.crop_size = image_size, crop_size
-        self.color_jitter, self.normalize = color_jitter, normalize
-
-        self.drop_under_threshold = drop_under_threshold
+        self.image_size = image_size
+        self.crop_size = crop_size
+        self.color_jitter = color_jitter
+        self.normalize = normalize
         self.ignore_under_threshold = ignore_under_threshold
+        self.drop_under_threshold = drop_under_threshold
 
-    def _infer_dir(self, fname):
-        lang_indicator = fname.split('.')[1]
-        if lang_indicator == 'zh':
-            lang = 'chinese'
-        elif lang_indicator == 'ja':
-            lang = 'japanese'
-        elif lang_indicator == 'th':
-            lang = 'thai'
-        elif lang_indicator == 'vi':
-            lang = 'vietnamese'
-        else:
-            raise ValueError
-        return osp.join(self.root_dir, f'{lang}_receipt', 'img', self.split)
+        # merged_receipts 폴더 구조에 맞게 수정
+        self.image_dir = osp.join(root_dir, 'images', split)
+        self.annotation_path = osp.join(root_dir, f'{split}.json')
+        
+        if not osp.exists(self.image_dir):
+            raise ValueError(f"Image directory not found: {self.image_dir}")
+        if not osp.exists(self.annotation_path):
+            raise ValueError(f"Annotation file not found: {self.annotation_path}")
+            
+        self.annotations = []
+        
+        # UFO 형식 데이터 로드
+        with open(self.annotation_path, 'r', encoding='utf-8') as f:
+            annotations = json.load(f)
+        
+        for image_name, annotation in annotations['images'].items():
+            img_path = osp.join(self.image_dir, image_name)
+            if osp.exists(img_path):  # 이미지 파일이 실제로 존재하는지 확인
+                self.annotations.append({
+                    'file_name': image_name,
+                    'words': annotation.get('words', dict()),
+                    'img_path': img_path
+                })
+            else:
+                print(f"Warning: Image not found: {img_path}")
+
     def __len__(self):
-        return len(self.image_fnames)
+        # image_fnames 대신 annotations 사용
+        return len(self.annotations)
 
     def __getitem__(self, idx):
-        image_fname = self.image_fnames[idx]
-        image_fpath = osp.join(self._infer_dir(image_fname), image_fname)
-
+        # image_fname 대신 annotation 사용
+        annotation = self.annotations[idx]
+        image_fpath = annotation['img_path']
+        
         vertices, labels = [], []
-        for word_info in self.anno['images'][image_fname]['words'].values():
-            num_pts = np.array(word_info['points']).shape[0]
-            if num_pts > 4:
+        for word_info in annotation['words'].values():
+            points = np.array(word_info['points'])
+            if points.shape[0] > 4:
                 continue
-            vertices.append(np.array(word_info['points']).flatten())
+            vertices.append(points.flatten())
             labels.append(1)
-        vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+        vertices = np.array(vertices, dtype=np.float32)
+        labels = np.array(labels, dtype=np.int64)
 
         vertices, labels = filter_vertices(
             vertices,
@@ -403,9 +573,14 @@ class SceneTextDataset(Dataset):
         )
 
         image = Image.open(image_fpath)
+        # 전처리 적용
+        # image = preprocess_receipt(image)
+        # 30% 확률로 상하 반전 (필요한 경우)
+        if np.random.random() > 0.5:
+            image, vertices = flip_img(image, vertices, flip_type="vertical")
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
-        image, vertices = rotate_img(image, vertices)
+        image, vertices = rotate_img(image, vertices, angle_range=15)
         image, vertices = crop_img(image, vertices, labels, self.crop_size)
 
         if image.mode != 'RGB':

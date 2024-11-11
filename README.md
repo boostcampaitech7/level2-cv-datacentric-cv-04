@@ -68,11 +68,68 @@ python inference.py --data_dir=./data --output_dir --input_size=2048 --batch_siz
 
 ## Project Structure
 
-project_root/
-│
+프로젝트 폴더 구조를 맞춰야 상대경로로 인식됩니다. 
+
+또한 east_dataset.py, loss.py, model.py, detect.py는 대회 종료에 따라 더이상 제공하지 못할 수 있습니다.
+
+```
+** project structure **
+
+level2-cv-datacentric-cv-04/
 ├── data/
-│   ├── train/
-│   └── test/
+│   ├──chinese_receipt/
+│   │   ├── img
+│   │   │   ├── train/
+│   │   │   └── test/
+│   │   └── ufo
+│   │       ├── train.json
+│   │       └── test.json
+│   │
+│   ├──japanese_receipt/ 
+│   │   ├── img
+│   │   │   ├── train/
+│   │   │   └── test/
+│   │   └── ufo
+│   │       ├── train.json
+│   │       └── test.json
+│   │
+│   ├──thai_receipt/ 
+│   │   ├── img
+│   │   │   ├── train/
+│   │   │   └── test/
+│   │   └── ufo
+│   │       ├── train.json
+│   │       └── test.json
+│   │
+│   ├── vietnamese_receipt/
+│   │   ├── img
+│   │   │   ├── train/
+│   │   │   └── test/
+│   │   └── ufo
+│   │       ├── train.json
+│   │       └── test.json 
+│   │
+│   └── merged_receipts/
+│       ├── images
+│       │   ├── train/
+│       │   └── val/
+│       ├── train.json
+│       └── val.json
+│
+│
+├── streamlit/
+│   ├── pages/
+│   │   ├── data_EDA.py
+│   │   └── data_viewer.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   └── streamlit_data_loader.py
+│   ├── main.py
+│   └── st_requierment.txt
+│
+├──utils/
+│   ├── add_language.py
+│   └── prepare_dataset.py
 │
 ├── pths/
 ├── predictions/
@@ -86,6 +143,8 @@ project_root/
 ├── requirements.txt
 ├── loss.py
 ├── model.py
+├── detect.py
 └── README.md
+```
 
    
