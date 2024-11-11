@@ -335,34 +335,6 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
     return new_vertices, new_labels
 
 
-# class SceneTextDataset(Dataset):
-#     def __init__(self, root_dir,
-#                  split='train',
-#                  image_size=2048,
-#                  crop_size=1024,
-#                  ignore_under_threshold=10,
-#                  drop_under_threshold=1,
-#                  color_jitter=True,
-#                  normalize=True):
-#         self._lang_list = ['chinese', 'japanese', 'thai', 'vietnamese']
-#         self.root_dir = root_dir
-#         self.split = split
-#         total_anno = dict(images=dict())
-#         for nation in self._lang_list:
-#             with open(osp.join(root_dir, '{}_receipt/ufo/{}.json'.format(nation, split)), 'r', encoding='utf-8') as f:
-#                 anno = json.load(f)
-#             for im in anno['images']:
-#                 total_anno['images'][im] = anno['images'][im]
-
-#         self.anno = total_anno
-#         self.image_fnames = sorted(self.anno['images'].keys())
-
-#         self.image_size, self.crop_size = image_size, crop_size
-#         self.color_jitter, self.normalize = color_jitter, normalize
-
-#         self.drop_under_threshold = drop_under_threshold
-#         self.ignore_under_threshold = ignore_under_threshold
-
 # merged_receipts 폴더 구조에 맞게 수정된 코드
 def lsa_processing(img_array):
     """L*a*b* 색공간에서 L채널 처리"""
@@ -451,21 +423,6 @@ class SceneTextDataset:
                 })
             else:
                 print(f"Warning: Image not found: {img_path}")
-
-
-    # def _infer_dir(self, fname):
-    #     lang_indicator = fname.split('.')[1]
-    #     if lang_indicator == 'zh':
-    #         lang = 'chinese'
-    #     elif lang_indicator == 'ja':
-    #         lang = 'japanese'
-    #     elif lang_indicator == 'th':
-    #         lang = 'thai'
-    #     elif lang_indicator == 'vi':
-    #         lang = 'vietnamese'
-    #     else:
-    #         raise ValueError
-    #     return osp.join(self.root_dir, f'{lang}_receipt', 'img', self.split)
 
     def __len__(self):
         # image_fnames 대신 annotations 사용

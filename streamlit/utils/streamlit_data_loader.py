@@ -7,6 +7,9 @@ import os
 from pathlib import Path
 import streamlit as st
 from PIL import Image, ImageDraw
+import os.path as osp
+from typing import Tuple, Any, Union
+import albumentations as A
 
 ## EDA에 사용했던 내용 모듈화 ###
 def rectify_poly(poly: np.ndarray, direction: str = 'Horizontal') -> Tuple[float, float]:
@@ -109,9 +112,18 @@ def load_image_and_annotation(base_dir: str, lang: str, split: str, nation_dict:
     selected_image = st.selectbox("이미지 선택", image_files)
     
     if selected_image:
-        # 이미지 로드
         img_path = os.path.join(img_dir, selected_image)
-        image = Image.open(img_path).convert("RGB")
+        
+        # OpenCV로 이미지 로드 (회전 없이 원본 그대로)
+        image = cv2.imread(img_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # 이미지가 가로로 되어있다면 세로로 회전
+        if image.shape[1] > image.shape[0]:  # width > height
+            image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        
+        # PIL Image로 변환
+        image = Image.fromarray(image)
         
         # JSON 데이터 로드
         try:
@@ -122,6 +134,7 @@ def load_image_and_annotation(base_dir: str, lang: str, split: str, nation_dict:
             return image, None
     
     return None, None
+
 def draw_annotations(image, annotations):
     """이미지에 어노테이션을 그리는 함수
         input: 이미지, annotations
@@ -147,3 +160,56 @@ def draw_annotations(image, annotations):
             )
     
     return img_copy
+
+
+### 데이터 augmentation에 사용했던 내용 모듈화 ###
+
+def draw_boxes(img, vertices):
+    """박스 그리기 함수 수정"""
+    # 그레이스케일 이미지를 3채널로 변환
+    if len(img.shape) == 2:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    
+    result = img.copy()
+    if vertices is not None and len(vertices) > 0:
+        for vertex in vertices:
+            if vertex.size > 0:
+                pts = vertex.reshape((4, 2)).astype(np.int32)
+                cv2.polylines(result, [pts], True, (0, 255, 0), 2)
+    return result
+
+# 어노테이션에서 점과 라벨 추출
+def get_vertices_from_annotation(annotation: Dict) -> Tuple[np.ndarray, np.ndarray]:
+    """Extract vertices and labels from annotation"""
+    vertices, labels = [], []
+    for word_info in annotation['words'].values():
+        points = np.array(word_info['points'])
+        if points.shape[0] > 4:
+            continue
+        vertices.append(points.flatten())
+        labels.append(1)
+    return np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
+
+# 이미지와 어노테이션 로드
+def load_image_and_annotation_for_augmentation(image_path: str, annotation: Dict) -> Tuple[Image.Image, np.ndarray, np.ndarray]:
+    """Load image and get annotations for augmentation"""
+    image = Image.open(image_path)
+    if image.mode != 'RGB':
+        image = image.convert('RGB')
+    vertices, labels = get_vertices_from_annotation(annotation)
+    return image, vertices, labels
+
+# 전처리 통계 계산
+def get_preprocessing_stats(image: Union[Image.Image, np.ndarray], 
+                          vertices: np.ndarray) -> Dict:
+    """Get statistics about preprocessing step"""
+    if isinstance(image, Image.Image):
+        shape = np.array(image).shape
+    else:
+        shape = image.shape
+        
+    return {
+        'shape': shape,
+        'vertices_shape': vertices.shape,
+        'num_boxes': vertices.shape[0] if vertices.size > 0 else 0
+    }
