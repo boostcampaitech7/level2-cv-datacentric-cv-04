@@ -334,7 +334,57 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
 
     return new_vertices, new_labels
 
-# merged_receipts 폴더 구조에 맞게 수정된 코드 
+
+# merged_receipts 폴더 구조에 맞게 수정된 코드
+def lsa_processing(img_array):
+    """L*a*b* 색공간에서 L채널 처리"""
+    # 이미지가 그레이스케일인 경우 바로 처리
+    if len(img_array.shape) == 2:
+        l = img_array
+    else:
+        # RGB to LAB 변환
+        lab = cv2.cvtColor(img_array, cv2.COLOR_RGB2LAB)
+        l, a, b = cv2.split(lab)
+    
+    # L채널에 대해 CLAHE 적용
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+    enhanced_l = clahe.apply(l)
+    
+    # Bilateral 필터로 노이즈 제거하면서 경계는 보존
+    smooth_l = cv2.bilateralFilter(enhanced_l, 9, 75, 75)
+
+    return smooth_l
+
+def preprocess_receipt(image):
+    """영수증 이미지 전처리 함수"""
+    # PIL Image를 numpy array로 변환
+    if isinstance(image, Image.Image):
+        # RGB로 변환 보장
+        image = image.convert('RGB')
+        img_array = np.array(image)
+    else:
+        img_array = image.copy()
+        # 그레이스케일 이미지인 경우 RGB로 변환
+        if len(img_array.shape) == 2:
+            img_array = cv2.cvtColor(img_array, cv2.COLOR_GRAY2RGB)
+    
+    smooth_l = lsa_processing(img_array)
+
+    # 적응형 이진화 적용
+    binary = cv2.adaptiveThreshold(
+        smooth_l, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY, 11, 2
+    )
+    
+    # 노이즈 제거
+    denoised = cv2.medianBlur(binary, 3)
+
+    # 대비 향상
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(denoised)
+
+    return Image.fromarray(enhanced)
+
 class SceneTextDataset:
     def __init__(self, root_dir, split='train', image_size=2048, crop_size=1024, 
                  ignore_under_threshold=10, drop_under_threshold=1,
@@ -402,6 +452,8 @@ class SceneTextDataset:
         )
 
         image = Image.open(image_fpath)
+        # 전처리 적용
+        image = preprocess_receipt(image)
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
         image, vertices = rotate_img(image, vertices)
