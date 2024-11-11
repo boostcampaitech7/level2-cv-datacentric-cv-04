@@ -70,6 +70,8 @@ python inference.py --data_dir=./data --output_dir --input_size=2048 --batch_siz
 
 프로젝트 폴더 구조를 맞춰야 상대경로로 인식됩니다. 
 
+또한 east_dataset.py, loss.py, model.py, detect.py는 대회 종료에 따라 더이상 제공하지 못할 수 있습니다.
+
 ```
 ** project structure **
 
@@ -141,6 +143,7 @@ level2-cv-datacentric-cv-04/
 ├── requirements.txt
 ├── loss.py
 ├── model.py
+├── detect.py
 └── README.md
 ```
 
