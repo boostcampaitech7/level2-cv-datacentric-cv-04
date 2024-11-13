@@ -12,6 +12,15 @@ OCR은 글자 검출 (text detection), 글자 인식 (text recognition), 정렬�
 
 본 대회는 제출된 예측 (prediction) 파일로 평가합니다.
 
+## Result
+Public: 0.9030
+Private: 0.8983
+
+### Wrap-up Report
+
+[level2_CV기초대회3_CV_팀 리포트(04조).docx.pdf](https://github.com/user-attachments/files/17736758/level2_CV.3_CV_.04.docx.pdf)
+
+
 ## Data
 
 데이터 셋은 AI Stage 제공 데이터를 사용하였으며 라이센스에 따라 외부 공개가 어렵습니다.
